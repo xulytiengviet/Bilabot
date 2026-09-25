@@ -194,7 +194,7 @@
 #bilabot-gate .bb-code-preview[data-phase="error"] .bb-code-live {color:#fab1b8}
 #bilabot-gate .bb-auth-footer {border:0;padding:17px 0 0}
 #bilabot-gate .bb-connection {display:flex;align-items:center;gap:8px;font-size:10px;color:#afc0d5}
-#bilabot-gate .bb-state-dot {height:7px;width:7px;border-radius:50%;background:#8290ab;flex:none}
+#bilabot-gate .bb-state-dot {height:7px;width:7px;border-radius:50%;background:#8290ab;flex:none;box-shadow:none}
 #bilabot-gate .bb-connection[data-health="ready"] .bb-state-dot {background:#7be3b3;box-shadow:0 0 10px #7be3b3}
 #bilabot-gate .bb-connection[data-health="error"] .bb-state-dot {background:#f0ac97}
 #bilabot-gate #bb-health-check {margin-left:auto;border:1px solid #53657e;border-radius:7px;color:#b7c8df;
@@ -218,7 +218,7 @@
   color:#edf5ff;font-weight:800;padding:10px 14px;border-radius:8px;font-size:11px}
 #bilabot-gate .bb-selfconfig>.bb-hint {font-size:9px;color:#92a6c1;line-height:1.6;margin:13px 0 0}
 #bilabot-gate .bb-setup-guide {display:block;margin-top:15px;text-align:center;font-size:10px;font-weight:700;
-  color:#a6e7d7;text-decoration:underline;text-underline-offset:4px}
+  color:#a6e7d7!important;text-decoration:underline;text-underline-offset:4px}
 #bilabot-gate .bb-highlights {padding-top:78px}
 .bb-highlights-heading>span {color:#8aeed3;font-size:10px;font-weight:850;letter-spacing:.2em}
 #bilabot-gate .bb-highlights-heading h2 {font-size:clamp(25px,2.8vw,39px);letter-spacing:-.06em;
