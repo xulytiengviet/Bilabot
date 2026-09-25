@@ -1685,7 +1685,12 @@ const ProvisioningManager = (() => {
         throw new Error(data.error || `OTA check failed (${res.status})`);
       }
 
-      Logger.auth('OTA check response', data);
+      // Do not put bearer or MQTT credentials into user-exportable logs.
+      Logger.auth('OTA check response', {
+        activationRequired: Boolean(data.activation?.code || data.activation?.challenge),
+        websocketUrl: data.websocket?.url || '',
+        hasDeviceToken: Boolean(data.websocket?.token)
+      });
       applyServerConfig(data);
 
       activationCode = '';
@@ -1836,7 +1841,7 @@ const ProvisioningManager = (() => {
       // (Real firmware: HasActivationCode() == true → ShowActivationCode())
       if (activationCode) {
         setState(PAIRING_STATES.PAIRING_PENDING);
-        Logger.auth(`Activation required. Code: ${activationCode}. Challenge: ${activationChallenge}`);
+        Logger.auth('Activation code received from real OTA; awaiting XiaoZhi console pairing');
         return {
           needsUserAction: true,
           code: activationCode,
@@ -4100,6 +4105,9 @@ const SessionManager = (() => {
 
     protocol.on('disconnected', (code, reason) => {
       Logger.ws(`[${assistantId.slice(0, 8)}] Disconnected: ${code} ${reason}`);
+      if (isActiveId(assistantId)) window.dispatchEvent(new CustomEvent('bilabot:pairing', {
+        detail: { phase: 'disconnected', assistantId, message: reason || 'XiaoZhi đã đóng WebSocket trước khi kết nối hoàn tất.' }
+      }));
       AssistantManager.setConnectionStatus(assistantId, 'disconnected');
       AudioEngine.clearTTSQueue();
       if (isActiveId(assistantId)) {
