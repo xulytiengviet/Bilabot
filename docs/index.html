@@ -26,127 +26,130 @@
   <!-- Our CSS -->
   <link rel="stylesheet" href="./static/style.css" />
 <link rel="stylesheet" href="./landing.css"/>
+<link rel="stylesheet" href="./olivia-theme.css"/>
 <script src="./deploy.js"></script>
 <script src="./config.js"></script>
 <script src="https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit" async defer></script>
 </head>
 <body>
 <div id="bilabot-gate" class="bb-gate">
-  <div class="bb-light bb-light-one" aria-hidden="true"></div>
-  <div class="bb-light bb-light-two" aria-hidden="true"></div>
+  <div class="bb-atmosphere" aria-hidden="true"><span></span><span></span><span></span></div>
   <nav class="bb-nav" aria-label="Điều hướng BilaBot">
-    <a class="bb-brand" href="./" aria-label="BilaBot · Trang chủ">
-      <span class="bb-brand-icon" aria-hidden="true"><span>✳</span></span>
-      <span class="bb-brand-copy"><strong>BilaBot</strong><small>VOICE INTELLIGENCE</small></span>
+    <a class="bb-brand" href="./" aria-label="BilaBot - trang chủ">
+      <span class="bb-brand-icon"><i class="fas fa-asterisk" aria-hidden="true"></i></span>
+      <span class="bb-brand-copy"><strong>BilaBot<span class="bb-brand-dot">.</span></strong><small>YOUR AI VOICE COMPANION</small></span>
     </a>
     <div class="bb-nav-right">
-      <span class="bb-nav-status"><span class="bb-online-dot"></span> XIAOZHI AI</span>
-      <a href="#bb-setup">Bắt đầu</a>
-      <a href="https://xiaozhi.me/console/agents" target="_blank" rel="noopener noreferrer">XiaoZhi <span aria-hidden="true">↗</span></a>
-      <a class="bb-nav-github" href="https://github.com/xulytiengviet/Bilabot" target="_blank" rel="noopener noreferrer">GitHub <span aria-hidden="true">↗</span></a>
+      <a class="bb-nav-link" href="#bb-how">Cách hoạt động</a>
+      <a class="bb-nav-link" href="https://xiaozhi.me/console/agents" target="_blank" rel="noopener noreferrer">XiaoZhi <i class="fas fa-arrow-up-right-from-square" aria-hidden="true"></i></a>
+      <a class="bb-nav-github" href="https://github.com/xulytiengviet/Bilabot" target="_blank" rel="noopener noreferrer"><i class="fab fa-github" aria-hidden="true"></i> Mã nguồn</a>
+      <a class="bb-nav-cta" href="#bb-setup">Bắt đầu <i class="fas fa-arrow-right" aria-hidden="true"></i></a>
     </div>
   </nav>
 
-  <main class="bb-layout" id="bb-home">
-    <section class="bb-intro" aria-labelledby="bb-main-title">
-      <div class="bb-eyebrow"><span class="bb-eyebrow-dot"></span> KHÔNG CẦN ESP32 VẬT LÝ · SẴN SÀNG TRÊN TRÌNH DUYỆT</div>
-      <h1 id="bb-main-title">Trò chuyện với AI.<br><span>Đơn giản như một</span><br><em>cuộc hội thoại.</em></h1>
-      <p class="bb-lead">BilaBot biến Chrome, Edge và điện thoại thành trợ lý giọng nói XiaoZhi. Ghép nối bằng mã kích hoạt thật, trò chuyện tiếng Việt với Opus, STT/TTS và điều khiển công cụ qua MCP.</p>
-      <div class="bb-hero-actions">
-        <a class="bb-hero-primary" href="#bb-setup"><span>Thiết lập BilaBot</span><span aria-hidden="true">↗</span></a>
-        <button class="bb-hero-secondary" type="button" id="bb-open-app">Xem giao diện trò chuyện <span aria-hidden="true">→</span></button>
-      </div>
-      <div class="bb-quick-benefits" aria-label="Khả năng chính">
-        <span><span aria-hidden="true">✓</span> Không cần phần cứng</span>
-        <span><span aria-hidden="true">✓</span> Mã OTA từ XiaoZhi</span>
-        <span><span aria-hidden="true">✓</span> Dữ liệu thiết bị lưu cục bộ</span>
-      </div>
-      <div class="bb-voice-scene" aria-label="Mô phỏng trợ lý giọng nói BilaBot">
-        <div class="bb-voice-copy"><div class="bb-scene-kicker">BILABOT · LIVE VOICE</div>
-          <strong>Xin chào, tôi là BilaBot.</strong>
-          <span>Nhấn micro sau khi ghép nối để bắt đầu cuộc hội thoại.</span>
-          <div class="bb-voice-bars" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
-        </div>
-        <div class="bb-orb-area" aria-hidden="true">
-          <div class="bb-orb-ring bb-orb-ring-a"></div><div class="bb-orb-ring bb-orb-ring-b"></div>
-          <div class="bb-orb"><span class="bb-orb-core">✳</span></div>
-          <span class="bb-orb-spark bb-orb-spark-a"></span><span class="bb-orb-spark bb-orb-spark-b"></span>
-        </div>
-      </div>
-    </section>
+  <main class="bb-studio" id="bb-home">
+    <div class="bb-stage-title">
+      <p class="bb-kicker"><span class="bb-kicker-star">✳</span> TRỢ LÝ GIỌNG NÓI AI · THIẾT BỊ ESP32 ẢO</p>
+      <h1 id="bb-main-title">Một lời chào.<br><em>Mọi cuộc hội thoại bắt đầu.</em></h1>
+      <p class="bb-stage-lead">BilaBot mang trải nghiệm trò chuyện của Olivia AI lên trình duyệt: tạo thiết bị ảo, nhận mã thật từ XiaoZhi và bắt đầu nói chuyện bằng tiếng Việt. Không cần phần cứng.</p>
+      <div class="bb-proof"><span><i class="fas fa-circle-check" aria-hidden="true"></i> XiaoZhi OTA</span><span><i class="fas fa-circle-check" aria-hidden="true"></i> Opus &amp; WebSocket</span><span><i class="fas fa-circle-check" aria-hidden="true"></i> STT · TTS · MCP</span></div>
+    </div>
 
-    <section class="bb-signin" id="bb-setup" aria-labelledby="bb-setup-title">
-      <div class="bb-card-header">
-        <span class="bb-setup-label">THIẾT LẬP TRỢ LÝ</span>
-        <span class="bb-beta-tag"><span></span> WEB AI</span>
-      </div>
-      <h2 id="bb-setup-title">Bắt đầu với BilaBot</h2>
-      <p class="bb-setup-desc">Hai bước: đăng nhập trên XiaoZhi và lấy mã kích hoạt thật từ BilaBot.</p>
-      <div class="bb-setup-divider"></div>
-
-      <div class="bb-setup-step">
-        <div class="bb-step-index"><span>01</span></div>
-        <div class="bb-step-content">
-          <div class="bb-step-heading"><strong>Đăng nhập trên XiaoZhi</strong><span class="bb-step-badge bb-external">Trang chính thức ↗</span></div>
-          <p>Mở bảng điều khiển XiaoZhi trong tab mới và đăng nhập Google tại đó. BilaBot không đọc cookie hoặc mật khẩu của XiaoZhi.</p>
-          <a id="bb-open-xiaozhi" class="bb-xiaozhi-button" target="_blank" rel="noopener noreferrer" href="https://xiaozhi.me/console/agents">
-            <span class="bb-external-icon" aria-hidden="true">↗</span> Mở XiaoZhi · AI Agents
-          </a>
-        </div>
-      </div>
-      <div class="bb-step-connector" aria-hidden="true"></div>
-      <div class="bb-setup-step bb-step-final">
-        <div class="bb-step-index"><span>02</span></div>
-        <div class="bb-step-content">
-          <div class="bb-step-heading"><strong>Tạo thiết bị ESP32 ảo</strong><span class="bb-step-badge bb-ota">OTA PROVISIONING</span></div>
-          <p>BilaBot yêu cầu máy chủ XiaoZhi cấp mã, tự kiểm tra trạng thái và mở WebSocket sau khi bạn nhập mã ở bước ghép nối.</p>
-          <button type="button" id="bb-pair-start" class="bb-pair-button"><span aria-hidden="true">✳</span> Lấy mã kích hoạt từ XiaoZhi <span aria-hidden="true">→</span></button>
-          <div class="bb-code-preview" id="bb-code-preview" data-phase="idle">
-            <span>MÃ KÍCH HOẠT DO XIAOZHI CẤP</span>
-            <strong id="bb-code-value" aria-live="polite" aria-label="Chưa có mã kích hoạt">— — — — — —</strong>
-            <small id="bb-code-hint">Nhấn Lấy mã. Mã sẽ xuất hiện ngay tại đây khi OTA phản hồi.</small>
-            <div class="bb-code-actions" id="bb-code-actions" hidden>
-              <button type="button" id="bb-copy-code" class="bb-copy-code"><i class="fas fa-copy" aria-hidden="true"></i> Sao chép mã</button>
-              <a id="bb-open-pair-console" href="https://xiaozhi.me/console/agents" target="_blank" rel="noopener noreferrer">Mở XiaoZhi để nhập mã ↗</a>
+    <div class="bb-workspace">
+      <section class="bb-preview" aria-label="Giao diện trò chuyện BilaBot minh họa">
+        <div class="bb-preview-head"><div class="bb-window-dots" aria-hidden="true"><i></i><i></i><i></i></div><span><i class="fas fa-lock" aria-hidden="true"></i> BilaBot / Voice Workspace</span><span class="bb-preview-tag">MINH HỌA</span></div>
+        <div class="bb-preview-shell">
+          <aside class="bb-preview-sidebar">
+            <div class="bb-mini-brand"><span class="bb-mini-logo">✳</span><strong>BilaBot</strong></div>
+            <span class="bb-mini-label">KHÔNG GIAN CỦA BẠN</span>
+            <div class="bb-mini-assistant active"><span class="bb-mini-avatar">B</span><span><strong>BilaBot AI</strong><small id="bb-preview-status">Chưa ghép nối</small></span><i class="fas fa-ellipsis" aria-hidden="true"></i></div>
+            <div class="bb-mini-add"><i class="fas fa-plus" aria-hidden="true"></i> Thêm trợ lý</div>
+            <div class="bb-mini-sidebottom"><i class="fas fa-headphones" aria-hidden="true"></i> Trò chuyện &amp; giọng nói</div>
+          </aside>
+          <div class="bb-preview-chat">
+            <div class="bb-chatbar"><div class="bb-chat-avatar">✳</div><div><strong>BilaBot AI</strong><small>Trợ lý XiaoZhi · Bản xem trước</small></div><span class="bb-chatbar-icons" aria-hidden="true"><i class="fas fa-volume-high"></i><i class="fas fa-gear"></i></span></div>
+            <div class="bb-chat-content">
+              <div class="bb-chat-day">HÔM NAY</div>
+              <div class="bb-demo-bubble bb-bubble-ai"><span class="bb-bubble-avatar">✳</span><div>Xin chào! Tôi là BilaBot. Rất vui được trò chuyện cùng bạn. <small>AI · Minh họa</small></div></div>
+              <div class="bb-demo-bubble bb-bubble-user"><div>Chào BilaBot, hôm nay chúng ta bắt đầu nhé! <small>Bạn · Minh họa</small></div></div>
+              <div class="bb-wave-block"><span class="bb-wave-dot"><i class="fas fa-microphone" aria-hidden="true"></i></span><div><strong>Giọng nói tự nhiên</strong><small>Kết nối xong để sử dụng micro</small><div class="bb-wave-lines" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div></div></div>
             </div>
-            <p class="bb-pair-progress" id="bb-pair-progress" role="status" aria-live="polite">Chờ khởi tạo OTA.</p>
+            <div class="bb-chat-compose"><i class="fas fa-plus" aria-hidden="true"></i><span>Bắt đầu hội thoại sau khi ghép nối…</span><i class="fas fa-microphone" aria-hidden="true"></i></div>
           </div>
         </div>
+        <div class="bb-preview-footer"><span><i class="fas fa-sparkles" aria-hidden="true"></i> Trò chuyện đa trợ lý · Âm thanh 2 chiều</span><button class="bb-preview-enter" type="button" id="bb-open-app">Khám phá ứng dụng <i class="fas fa-arrow-right" aria-hidden="true"></i></button></div>
+      </section>
+
+      <section class="bb-signin" id="bb-setup" aria-labelledby="bb-setup-title">
+        <div class="bb-card-header"><span class="bb-card-kicker"><span class="bb-kicker-square">02</span> KẾT NỐI TRỢ LÝ</span><span class="bb-beta-tag"><i class="fas fa-shield-halved" aria-hidden="true"></i> OTA CHÍNH THỨC</span></div>
+        <h2 id="bb-setup-title">Sẵn sàng trò chuyện?</h2>
+        <p class="bb-setup-desc">Một lần ghép nối. Sau đó chỉ cần mở BilaBot là có thể trò chuyện với trợ lý AI của bạn.</p>
+        <ol class="bb-flow" aria-label="Tiến trình ghép nối">
+          <li id="bb-flow-ota"><span>1</span><small>Lấy mã OTA</small></li>
+          <li id="bb-flow-console"><span>2</span><small>Nhập trên XiaoZhi</small></li>
+          <li id="bb-flow-ws"><span>3</span><small>Kết nối BilaBot</small></li>
+        </ol>
+        <div class="bb-step bb-step-first">
+          <div class="bb-step-badge-num">01</div>
+          <div class="bb-step-content">
+            <div class="bb-step-heading"><strong>Đăng nhập XiaoZhi</strong><span class="bb-step-label">TÀI KHOẢN CỦA BẠN</span></div>
+            <p>Mở bảng điều khiển XiaoZhi, đăng nhập và chọn AI Agent muốn sử dụng. BilaBot không yêu cầu mật khẩu hay cookie XiaoZhi.</p>
+            <a id="bb-open-xiaozhi" class="bb-xiaozhi-button" target="_blank" rel="noopener noreferrer" href="https://xiaozhi.me/console/agents">Mở XiaoZhi.me <i class="fas fa-arrow-up-right-from-square" aria-hidden="true"></i></a>
+          </div>
+        </div>
+        <div class="bb-step-divider" aria-hidden="true"></div>
+        <div class="bb-step bb-step-final">
+          <div class="bb-step-badge-num">02</div>
+          <div class="bb-step-content">
+            <div class="bb-step-heading"><strong>Nhận mã kích hoạt</strong><span class="bb-step-label bb-label-highlight">ESP32 ẢO</span></div>
+            <p>BilaBot sẽ yêu cầu máy chủ XiaoZhi cấp mã OTA thật cho trình duyệt này.</p>
+            <button type="button" id="bb-pair-start" class="bb-pair-button"><i class="fas fa-bolt" aria-hidden="true"></i> <span>Lấy mã kích hoạt</span> <i class="fas fa-arrow-right" aria-hidden="true"></i></button>
+          </div>
+        </div>
+        <div class="bb-code-preview" id="bb-code-preview" data-phase="idle">
+          <div class="bb-code-header"><span>MÃ KÍCH HOẠT XIAOZHI</span><span class="bb-code-live"><i class="fas fa-circle" aria-hidden="true"></i> <span id="bb-code-state">CHƯA CÓ MÃ</span></span></div>
+          <strong id="bb-code-value" aria-live="polite" aria-label="Chưa có mã kích hoạt">— — — — — —</strong>
+          <small id="bb-code-hint">Nhấn “Lấy mã kích hoạt” để yêu cầu mã trực tiếp từ XiaoZhi.</small>
+          <div class="bb-code-actions" id="bb-code-actions" hidden>
+            <button type="button" id="bb-copy-code" class="bb-copy-code"><i class="fas fa-copy" aria-hidden="true"></i> Sao chép mã</button>
+            <a id="bb-open-pair-console" href="https://xiaozhi.me/console/agents" target="_blank" rel="noopener noreferrer">Nhập mã tại XiaoZhi <i class="fas fa-arrow-up-right-from-square" aria-hidden="true"></i></a>
+          </div>
+          <div class="bb-pair-tracker"><i class="fas fa-circle-notch" aria-hidden="true"></i><p class="bb-pair-progress" id="bb-pair-progress" role="status" aria-live="polite">Sẵn sàng tạo thiết bị ảo.</p><span class="bb-code-expiry" id="bb-code-expiry" hidden></span></div>
+          <button type="button" id="bb-cancel-pair" class="bb-cancel-pair" hidden>Hủy và thử lại</button>
+        </div>
+        <div class="bb-auth-footer">
+          <div class="bb-connection"><span class="bb-state-dot"></span><span id="bb-server-state" role="status">Đang kiểm tra gateway</span><button type="button" id="bb-health-check" aria-label="Kiểm tra lại kết nối Cloudflare gateway" title="Kiểm tra kết nối"><i class="fas fa-rotate-right" aria-hidden="true"></i></button></div>
+          <p id="bb-auth-status" class="bb-hint" role="status" aria-live="polite">Máy chủ cần sẵn sàng trước khi lấy mã.</p>
+          <div id="bb-auth-error" class="bb-error" role="alert" hidden></div>
+          <div id="bb-turnstile" class="bb-turnstile" hidden></div>
+        </div>
+        <details class="bb-selfconfig" id="bb-selfconfig">
+          <summary><i class="fas fa-sliders" aria-hidden="true"></i> Cấu hình nâng cao <i class="fas fa-chevron-down" aria-hidden="true"></i></summary>
+          <label for="bb-relay-mode">Chế độ kết nối</label>
+          <select id="bb-relay-mode">
+            <option value="gateway">XiaoZhi chính thức · Proxy Hono trên Cloudflare Pages</option>
+            <option value="direct">Máy chủ tự quản hỗ trợ CORS và WebSocket trình duyệt</option>
+          </select>
+          <label for="bb-api-input">Địa chỉ gateway HTTPS của bạn</label>
+          <input id="bb-api-input" type="url" placeholder="https://ten-du-an.pages.dev" autocomplete="off" spellcheck="false">
+          <button id="bb-save-config" type="button">Lưu cấu hình</button>
+          <p class="bb-hint">GitHub Pages chỉ chạy giao diện; để lấy mã OTA cần Cloudflare Pages hoặc gateway HTTPS tin cậy. Không nhập mật khẩu hoặc secret ở đây.</p>
+        </details>
+        <a class="bb-setup-guide" href="https://github.com/xulytiengviet/Bilabot/blob/main/docs/SETUP.md" target="_blank" rel="noopener noreferrer">Hướng dẫn triển khai Cloudflare Pages <i class="fas fa-arrow-up-right-from-square" aria-hidden="true"></i></a>
+      </section>
+    </div>
+
+    <section class="bb-highlights" id="bb-how" aria-labelledby="bb-highlights-title">
+      <div class="bb-highlights-heading"><span>KHẢ NĂNG CỦA BILABOT</span><h2 id="bb-highlights-title">Một thiết bị ảo. Mọi trải nghiệm AI.</h2></div>
+      <div class="bb-highlight-grid">
+        <article><span class="bb-highlight-icon"><i class="fas fa-microphone-lines" aria-hidden="true"></i></span><h3>Giọng nói thời gian thực</h3><p>Trò chuyện tiếng Việt qua micro và loa với mã hóa Opus hai chiều.</p></article>
+        <article><span class="bb-highlight-icon"><i class="fas fa-link" aria-hidden="true"></i></span><h3>Ghép nối thông minh</h3><p>Nhận mã OTA do XiaoZhi cấp, tự kiểm tra trạng thái và kết nối WebSocket.</p></article>
+        <article><span class="bb-highlight-icon"><i class="fas fa-brain" aria-hidden="true"></i></span><h3>STT · TTS · MCP</h3><p>Nhận dạng lời nói, tổng hợp giọng nói và mở rộng bằng công cụ AI được cấp quyền.</p></article>
       </div>
-      <div class="bb-auth-footer">
-        <div class="bb-connection"><span class="bb-state-dot"></span><span id="bb-server-state" role="status">Kiểm tra kết nối</span></div>
-        <p id="bb-auth-status" class="bb-hint" role="status" aria-live="polite">Kiểm tra cấu hình để bắt đầu.</p>
-        <div id="bb-auth-error" class="bb-error" role="alert" hidden></div>
-        <div id="bb-turnstile" class="bb-turnstile" hidden></div>
-      </div>
-      <details class="bb-selfconfig" id="bb-selfconfig">
-        <summary>Cấu hình kết nối nâng cao <span aria-hidden="true">⌄</span></summary>
-        <label for="bb-relay-mode">Chế độ kết nối</label>
-        <select id="bb-relay-mode">
-          <option value="gateway">XiaoZhi chính thức · Hono trên Cloudflare Pages</option>
-          <option value="direct">Máy chủ tự quản hỗ trợ CORS / WebSocket trình duyệt</option>
-        </select>
-        <label for="bb-api-input">URL proxy tùy chọn (mặc định: cùng tên miền)</label>
-        <input id="bb-api-input" type="url" placeholder="Để trống để dùng proxy tích hợp" autocomplete="off">
-        <button id="bb-save-config" type="button">Lưu cấu hình trên thiết bị</button>
-        <p class="bb-hint">Không nhập mật khẩu, client secret hoặc cookie tại đây. Chỉ dùng gateway bạn tin cậy.</p>
-      </details>
-      <a class="bb-setup-guide" href="https://github.com/xulytiengviet/Bilabot/blob/main/docs/SETUP.md" target="_blank" rel="noopener noreferrer">Hướng dẫn triển khai dành cho chủ website ↗</a>
     </section>
   </main>
 
-  <section class="bb-feature-section" aria-labelledby="bb-feature-title">
-    <div class="bb-features-heading"><span>BUILT FOR VOICE</span><h2 id="bb-feature-title">Một trợ lý. Nhiều khả năng.</h2></div>
-    <div class="bb-feature-grid">
-      <article><span class="bb-feature-icon">◉</span><h3>Giọng nói thời gian thực</h3><p>Micro và loa trên thiết bị của bạn, truyền Opus hai chiều qua WebSocket có xác thực.</p></article>
-      <article><span class="bb-feature-icon">✦</span><h3>Nhận dạng &amp; tổng hợp</h3><p>XiaoZhi xử lý STT, mô hình AI và TTS; BilaBot hiển thị hội thoại ngay trong trình duyệt.</p></article>
-      <article><span class="bb-feature-icon">⌘</span><h3>Mở rộng với MCP</h3><p>Kết nối công cụ được cấp quyền, điều khiển thiết bị và mở rộng trợ lý theo giao thức JSON-RPC.</p></article>
-    </div>
-  </section>
-
-  <footer class="bb-footer"><span>© 2026 BilaBot · Long Ngo · Phát triển từ Olivia AI (MIT)</span>
-    <span><a href="./privacy-policy.html">Quyền riêng tư</a><a href="https://github.com/78/xiaozhi-esp32" target="_blank" rel="noopener noreferrer">XiaoZhi Protocol ↗</a><a href="https://github.com/xulytiengviet/Bilabot" target="_blank" rel="noopener noreferrer">Mã nguồn ↗</a></span>
-  </footer>
+  <footer class="bb-footer"><span>© 2026 BilaBot · Long Ngo · Dựa trên <a href="https://github.com/roalfb/olivia-ai" target="_blank" rel="noopener noreferrer">Olivia AI (MIT)</a></span><span><a href="./privacy-policy.html">Quyền riêng tư</a><a href="https://github.com/xulytiengviet/Bilabot" target="_blank" rel="noopener noreferrer">GitHub</a><a href="https://github.com/78/xiaozhi-esp32" target="_blank" rel="noopener noreferrer">XiaoZhi ESP32</a></span></footer>
 </div>
 
 <!-- ╔══════════════════════════════════════════════════════════╗
