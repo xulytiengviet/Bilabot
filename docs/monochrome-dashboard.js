@@ -7,6 +7,7 @@
   const $ = id => document.getElementById(id);
   const panel = $('settingsPanel');
   if (!panel) return;
+  document.body.classList.add('bb-mono-settings');
   const panes = new Set(['overview','assistant','connection','device','protocol','audio','data']);
   let gatewayRequest = 0;
   const STATUS = {checking:'Đang kiểm tra',ready:'Sẵn sàng',error:'Chưa sẵn sàng',idle:'Chưa kiểm tra'};
@@ -87,7 +88,6 @@
     }
     if(!safeHost(url)){
       setGatewayState('error','Vui lòng nhập URL HTTPS hợp lệ của Cloudflare Pages.');
-      activate('connection');
       return;
     }
     const request=++gatewayRequest;
@@ -158,6 +158,14 @@
       showValidation(error);
     }else{$('bb-db-validation').hidden=true;}
   }
+  function openDashboard(){
+    const api=settings(),id=api?.assistants?.getActiveId?.();
+    if(id&&api?.ui?.openSettingsFor){api.ui.openSettingsFor(id);activate('overview');}
+    else{
+      // AppController emits app-ready once AssistantManager has loaded.
+      window.addEventListener('bilabot:app-ready',openDashboard,{once:true});
+    }
+  }
   function openPairing(){
     $('closeSettingsBtn')?.click();
     window.BilaBotDirect?.openSetup?.();
@@ -174,6 +182,8 @@
   $('bb-db-save-gateway')?.addEventListener('click',saveGateway);
   $('saveSettingsBtn')?.addEventListener('click',validateAssistant,true);
   window.addEventListener('bilabot:settings-open',()=>{activate('overview');refreshSummary();syncGateway();});
+  $('bb-open-dashboard-chat')?.addEventListener('click',openDashboard);
+  $('bb-open-dashboard-sidebar')?.addEventListener('click',openDashboard);
   window.addEventListener('bilabot:pairing',refreshSummary);
   window.addEventListener('bilabot:app-ready',()=>{refreshSummary();syncGateway();});
   $('closeSettingsBtn')?.addEventListener('click',()=>{
