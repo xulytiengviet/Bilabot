@@ -27,12 +27,13 @@
   <link rel="stylesheet" href="./static/style.css" />
 <link rel="stylesheet" href="./landing.css?v=studio4"/>
 <link rel="stylesheet" href="./olivia-theme.css?v=studio4"/>
+<link rel="stylesheet" href="./direct-setup.css?v=direct1"/>
 <script src="./deploy.js?v=studio4"></script>
 <script src="./config.js?v=studio4"></script>
 <script src="https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit" async defer></script>
 </head>
-<body>
-<div id="bilabot-gate" class="bb-gate">
+<body class="bilabot-open">
+<div id="bilabot-gate" class="bb-gate" role="dialog" aria-modal="true" aria-label="Thiết lập XiaoZhi cho BilaBot" aria-hidden="true">
   <div class="bb-atmosphere" aria-hidden="true"><span></span><span></span><span></span></div>
   <nav class="bb-nav" aria-label="Điều hướng BilaBot">
     <a class="bb-brand" href="./" aria-label="BilaBot - trang chủ">
@@ -81,6 +82,7 @@
       </section>
 
       <section class="bb-signin" id="bb-setup" aria-labelledby="bb-setup-title">
+        <div class="bb-direct-drawer-head"><span><i class="fas fa-wand-magic-sparkles" aria-hidden="true"></i> BILABOT · CẤU HÌNH TRỰC TIẾP</span><button id="bb-close-setup" type="button" aria-label="Đóng bảng cấu hình"><i class="fas fa-xmark" aria-hidden="true"></i></button></div>
         <div class="bb-card-header"><span class="bb-card-kicker"><span class="bb-kicker-square">02</span> KẾT NỐI TRỢ LÝ</span><span class="bb-beta-tag"><i class="fas fa-shield-halved" aria-hidden="true"></i> OTA CHÍNH THỨC</span></div>
         <h2 id="bb-setup-title">Sẵn sàng trò chuyện?</h2>
         <p class="bb-setup-desc">Một lần ghép nối. Sau đó chỉ cần mở BilaBot là có thể trò chuyện với trợ lý AI của bạn.</p>
@@ -135,6 +137,7 @@
           <button id="bb-save-config" type="button">Lưu cấu hình</button>
           <p class="bb-hint">GitHub Pages chỉ chạy giao diện; để lấy mã OTA cần Cloudflare Pages hoặc gateway HTTPS tin cậy. Không nhập mật khẩu hoặc secret ở đây.</p>
         </details>
+        <div class="bb-direct-assistant-tools"><button type="button" id="bb-open-assistant-settings"><i class="fas fa-sliders" aria-hidden="true"></i> Thiết lập trợ lý (OTA, WebSocket, thiết bị)</button></div>
         <a class="bb-setup-guide" href="https://github.com/xulytiengviet/Bilabot/blob/main/docs/SETUP.md" target="_blank" rel="noopener noreferrer">Hướng dẫn triển khai Cloudflare Pages <i class="fas fa-arrow-up-right-from-square" aria-hidden="true"></i></a>
       </section>
     </div>
@@ -181,16 +184,14 @@
       </button>
     </div>
 
-    <section class="bilabot-login-box" aria-label="Kết nối tài khoản XiaoZhi">
-      <div class="bilabot-login-label">BẮT ĐẦU VỚI XIAOZHI</div>
-      <a class="bilabot-login-link" target="_blank" rel="noopener noreferrer"
-         href="https://xiaozhi.me/console/agents">
-        <i class="fas fa-arrow-up-right-from-square"></i> Đăng nhập XiaoZhi
-      </a>
-      <p>Đăng nhập tại trang chính thức, quay lại BilaBot và nhấn nút Kết nối (biểu tượng phích cắm). Lần đầu cần nhập mã kích hoạt thiết bị ảo.</p>
+    <section class="bilabot-login-box bb-direct-onboarding" aria-label="Ghép nối XiaoZhi">
+      <div class="bilabot-login-label"><i class="fas fa-bolt" aria-hidden="true"></i> KẾT NỐI XIAOZHI</div>
+      <p class="bb-onboarding-status" id="bb-sidebar-pair-state" role="status">Thiết lập thiết bị ảo để trò chuyện</p>
+      <button type="button" class="bb-sidebar-setup-cta" id="bb-open-setup-sidebar"><i class="fas fa-wand-magic-sparkles" aria-hidden="true"></i> Lấy mã / Cấu hình <i class="fas fa-arrow-right" aria-hidden="true"></i></button>
+      <a class="bb-sidebar-xiaozhi" href="https://xiaozhi.me/console/agents" target="_blank" rel="noopener noreferrer">Đăng nhập XiaoZhi.me <i class="fas fa-arrow-up-right-from-square" aria-hidden="true"></i></a>
     </section>
 
-    <div class="bb-identity" id="bb-identity"><a href="https://xiaozhi.me/console/agents" target="_blank" rel="noopener noreferrer">↗ AI Agent trên XiaoZhi</a><button type="button" id="bb-return-home">Trang chủ</button></div>
+    <div class="bb-identity" id="bb-identity"><a href="https://xiaozhi.me/console/agents" target="_blank" rel="noopener noreferrer">↗ AI Agent XiaoZhi</a><button type="button" id="bb-return-home">Thiết lập</button></div>
     <!-- Navigation Tabs -->
     <div class="sidebar-tabs">
       <button class="tab-btn active" data-tab="chat">
@@ -505,6 +506,7 @@
           <i class="fas fa-circle" id="stateChipIcon"></i>
           <span id="stateChipText">IDLE</span>
         </div>
+        <button class="action-btn bb-header-setup-btn" id="bb-open-setup-chat" type="button" title="Lấy mã OTA và cấu hình trực tiếp" aria-label="Lấy mã và cấu hình XiaoZhi"><i class="fas fa-sliders" aria-hidden="true"></i><span>Cấu hình</span></button>
         <button class="action-btn" id="connectBtn" title="Kết nối XiaoZhi">
           <i class="fas fa-plug"></i>
         </button>
@@ -826,8 +828,9 @@
 <div class="toast-container" id="toastContainer"></div>
 
 <!-- Our JS modules (loaded as module scripts) -->
-<script src="./auth.js?v=studio4"></script>
-<script type="module" src="./static/app.js?v=studio4"></script>
+<script src="./auth.js?v=direct1"></script>
+<script src="./direct-setup.js?v=direct1"></script>
+<script type="module" src="./static/app.js?v=direct1"></script>
 
 </body>
 </html>
