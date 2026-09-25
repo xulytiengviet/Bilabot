@@ -1,3 +1,14 @@
+# BilaBot — Web AI trên GitHub Pages
+
+**Giao diện:** https://xulytiengviet.github.io/Bilabot/  
+**Mã nguồn:** https://github.com/xulytiengviet/Bilabot  
+**Thiết lập Pages + Google OAuth + Cloudflare Worker:** [docs/SETUP.md](docs/SETUP.md)  
+**Triển khai Gateway:** [worker/README.md](worker/README.md)
+
+Trang GitHub Pages có landing tiếng Việt theo phong cách Olivia, đăng nhập Google Identity Services, tự chạy OTA provisioning để **nhận mã kích hoạt do máy chủ XiaoZhi cấp**, sau đó ghép nối trên xiaozhi.me và sử dụng WebSocket, Opus, STT/TTS, MCP. Chủ ứng dụng **phải triển khai Cloudflare Worker và cấu hình Google OAuth Client ID** một lần trước khi khách truy cập sử dụng. Google không đăng nhập hộ người dùng vào XiaoZhi; bước ghép nối đầu tiên vẫn bắt buộc.
+
+---
+
 # BilaBot — XiaoZhi Web AI (thiết bị ESP32 ảo)
 
 Ứng dụng giọng nói tiếng Việt trên Chrome, Edge và điện thoại. BilaBot được phát triển dựa trên kiến trúc và mã nguồn [Olivia AI](https://github.com/roalfb/olivia-ai) (MIT), tương thích giao thức [XiaoZhi ESP32](https://github.com/78/xiaozhi-esp32) (MIT).

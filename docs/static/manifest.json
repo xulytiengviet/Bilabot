@@ -1,0 +1,19 @@
+{
+  "name": "BilaBot – Trợ lý XiaoZhi Web AI",
+  "short_name": "BilaBot",
+  "description": "Trợ lý tiếng Việt XiaoZhi với Google Sign-In và ghép nối thiết bị ảo",
+  "lang": "vi",
+  "start_url": "../",
+  "scope": "../",
+  "display": "standalone",
+  "background_color": "#061c27",
+  "theme_color": "#078d83",
+  "icons": [
+    {
+      "src": "./logo/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

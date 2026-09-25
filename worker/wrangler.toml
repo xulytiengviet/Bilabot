@@ -1,0 +1,9 @@
+name = "bilabot-gateway"
+main = "src/index.js"
+compatibility_date = "2026-07-14"
+workers_dev = true
+
+[vars]
+PAGE_ORIGIN = "https://xulytiengviet.github.io"
+# Set GOOGLE_CLIENT_ID with wrangler secret put or vars; never set OAuth client SECRET here.
+# Set SESSION_SECRET (>=32 random chars) and TICKET_KEY (64 hex chars) via wrangler secret put.

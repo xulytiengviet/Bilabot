@@ -1,0 +1,41 @@
+name: Deploy BilaBot GitHub Pages
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "docs/**"
+      - ".github/workflows/pages.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate static site and Worker
+        run: |
+          node --check docs/auth.js
+          node --check docs/config.js
+          node --check docs/static/app.js
+          node --check worker/src/index.js
+          test -f docs/index.html
+          test -f docs/.nojekyll
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: ./docs
+      - uses: actions/deploy-pages@v4
+        id: deployment
