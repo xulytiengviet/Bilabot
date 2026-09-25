@@ -4969,7 +4969,7 @@ const UIController = (() => {
     if (el('pairingMessage') && message) {
       el('pairingMessage').innerHTML =
         escapeHtml(message).replace(/\n/g, '<br>') +
-        '<br>Go to <a href="https://xiaozhi.me" target="_blank" rel="noopener">xiaozhi.me</a> and enter this code.';
+        '<br>Mở <a href="https://xiaozhi.me/console/agents" target="_blank" rel="noopener">XiaoZhi AI Agents</a> và nhập mã kích hoạt này.';
     }
     updatePairingStatus(ProvisioningManager.PAIRING_STATES.PAIRING_PENDING, code);
     overlay.style.display = 'flex';
