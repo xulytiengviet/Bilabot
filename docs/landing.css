@@ -198,3 +198,15 @@ body.bilabot-open #bilabot-gate { display:none!important; }
 @media(prefers-reduced-motion:reduce) {
   .bb-gate *, .bb-gate *::before, .bb-gate *::after { animation-duration:.001ms!important;transition-duration:.001ms!important;scroll-behavior:auto!important; }
 }
+
+/* Inline OTA activation: show the real code without hiding #bb-setup. */
+.bb-code-preview[data-phase="checking"], .bb-code-preview[data-phase="connecting"] {border-color:#7aaec3;background:#eaf7fa;}
+.bb-code-preview[data-phase="code"] {border-color:#19af91;background:#ecfbf5;}
+.bb-code-preview[data-phase="paired"], .bb-code-preview[data-phase="connected"] {border-color:#12a678;background:#e7faf0;}
+.bb-code-preview[data-phase="error"] {border-color:#dd827f;background:#fff1f0;}
+.bb-code-preview #bb-code-value {display:block;user-select:all;font-size:clamp(24px,4vw,37px);letter-spacing:.22em;color:#135f67;overflow-wrap:anywhere;}
+.bb-code-actions {display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:9px;margin-top:8px;}
+.bb-copy-code,.bb-code-actions a {font:inherit;font-size:12px;font-weight:750;border:1px solid #91cebf;border-radius:9px;padding:9px 13px;cursor:pointer;color:#0c695e;background:#fff;text-decoration:none;}
+.bb-copy-code:hover,.bb-code-actions a:hover {background:#e0f7ed;}
+.bb-pair-progress {font-size:12px;line-height:1.5;color:#245e6d;margin:7px 0 0;}
+#bb-pair-start:disabled {opacity:.66;cursor:progress;}
