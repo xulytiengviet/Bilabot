@@ -1819,7 +1819,7 @@ const ProvisioningManager = (() => {
       // Server returned NO activation requirement — device is already registered.
       // (Real firmware: HasActivationCode() == false → break the while loop)
       if (!activationCode && !activationChallenge) {
-        if (get('token')) {
+        if (get('paired') && get('token')) {
           set('paired', true);
           setState(PAIRING_STATES.PAIRED);
           Logger.auth('Device already registered (no activation code in OTA response)');
@@ -1845,13 +1845,10 @@ const ProvisioningManager = (() => {
         };
       }
 
-      // Has challenge but no code (unusual) — treat as activation needed but no display code
+      // A challenge without a display code cannot be completed by a human.
       if (activationChallenge) {
-        setState(PAIRING_STATES.PAIRING_PENDING);
-        Logger.warn('OTA has activation challenge but no display code — proceeding as paired');
-        set('paired', true);
-        setState(PAIRING_STATES.PAIRED);
-        return { needsUserAction: false };
+        setState(PAIRING_STATES.FAILED);
+        throw new Error('OTA trả challenge nhưng không cấp mã để nhập trên XiaoZhi. Vui lòng kiểm tra nhật ký và thử lại.');
       }
 
       // Fallback: should not reach here
