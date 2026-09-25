@@ -74,6 +74,10 @@
 
   function onAppReady() {
     refreshSidebar();
+    if (window.location.hash === '#bb-dashboard') {
+      // Let the settings module open the direct dashboard instead of the OTA drawer.
+      return;
+    }
     if (window.location.hash === '#bb-setup') {
       openSetup();
       return;
