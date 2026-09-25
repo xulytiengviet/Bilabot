@@ -220,7 +220,9 @@
       }
     })().finally(()=>{
       pairingInFlight=null;
-      if(ui('bb-pair-start'))ui('bb-pair-start').disabled=false;
+      // Keep the activation button locked while the new WS awaits server hello.
+      if(ui('bb-pair-start')&&['idle','connected','error','cancelled','disconnected'].includes(currentPhase))
+        ui('bb-pair-start').disabled=false;
     });
     return pairingInFlight;
   }
@@ -257,7 +259,7 @@
   if(ui('bb-api-input'))ui('bb-api-input').value=settings.workerUrl;
   if(ui('bb-relay-mode'))ui('bb-relay-mode').value=settings.mode;
   if(settings.mode==='direct'){
-    setGatewayStatus('ready','Máy chủ tự quản (chế độ trực tiếp)');
+    setGatewayStatus('checking','Chế độ trực tiếp — chưa kiểm tra');
     setStatus('Chỉ dùng trực tiếp với máy chủ hỗ trợ CORS và không yêu cầu header WebSocket tùy chỉnh.');
   }else if(!validBase()){
     setGatewayStatus('error','Chưa cấu hình Cloudflare gateway');
