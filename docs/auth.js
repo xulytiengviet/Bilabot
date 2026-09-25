@@ -61,7 +61,10 @@
     return(healthCache=data);
   }
   async function challenge(siteKey){
-    if(!window.turnstile?.render)throw new Error('Không tải được Cloudflare Turnstile. Vui lòng tắt tiện ích chặn captcha rồi thử lại.');
+    // The Turnstile script is async: a quick first click should not fail while it loads.
+    for(let attempt=0;!window.turnstile?.render && attempt<50;attempt++)
+      await new Promise(resolve=>setTimeout(resolve,200));
+    if(!window.turnstile?.render)throw new Error('Không tải được Cloudflare Turnstile. Kiểm tra kết nối hoặc tiện ích chặn nội dung rồi thử lại.');
     const holder=ui('bb-turnstile');if(!holder)throw new Error('Thiếu vùng Turnstile.');
     holder.hidden=false;holder.replaceChildren();
     setStatus('Xác nhận kết nối an toàn với proxy (không cần đăng nhập Google lần nữa)…');
@@ -190,6 +193,8 @@
       if(ui('bb-code-hint')&&!lastActivationCode)ui('bb-code-hint').textContent='Không có mã giả. Kiểm tra kết nối và nhấn Lấy mã để thử lại.';
     }
   }
+  let appInitError='';
+  window.addEventListener('bilabot:app-error',e=>{appInitError=e.detail?.message||'BilaBot chưa khởi tạo được.';});
   window.addEventListener('bilabot:pairing',handlePairingEvent);
   async function startPair(){
     if(pairingInFlight)return pairingInFlight;
@@ -201,14 +206,15 @@
         if(settings.mode==='gateway')await ensureSession();
         // Leave the setup card visible while OTA responds and the user enters
         // the code at xiaozhi.me. The app opens only after server hello.
-        for(let i=0;i<50;i++){
-          if(window.XiaozhiDebug?.quickTest){
+        for(let i=0;i<150;i++){
+          if(appInitError)throw new Error('Không khởi tạo được BilaBot: '+appInitError);
+          if(window.BilaBotAppReady && window.XiaozhiDebug?.quickTest){
             await window.XiaozhiDebug.quickTest();
             return;
           }
           await new Promise(resolve=>setTimeout(resolve,120));
         }
-        throw new Error('Giao diện chưa khởi tạo; vui lòng tải lại trang.');
+        throw new Error('Giao diện BilaBot chưa khởi tạo trên thiết bị này. Tải lại trang hoặc kiểm tra nhật ký trình duyệt.');
       }catch(e){
         handlePairingEvent({detail:{phase:'error',message:e?.message||'Không thể ghép nối.'}});
       }
