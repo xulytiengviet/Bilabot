@@ -112,6 +112,9 @@
       if(ui('bb-code-hint'))ui('bb-code-hint').textContent='Thiết bị đã hoạt động. Nhấn micro để cấp quyền và bắt đầu trò chuyện.';
       if(ui('bb-pair-start'))ui('bb-pair-start').disabled=false;
       setTimeout(()=>document.body.classList.add('bilabot-open'),700);
+    }else if(phase==='disconnected'){
+      if(currentPhase!=='connected'&&currentPhase!=='error')
+        handlePairingEvent({detail:{phase:'error',message:d.message||'XiaoZhi đóng WebSocket trước khi xác nhận kết nối.'}});
     }else if(phase==='error'){
       const message=String(d.message||'Không thể lấy mã hoặc kết nối tới XiaoZhi.');
       pairProgress('error',message);
