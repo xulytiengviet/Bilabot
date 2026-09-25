@@ -100,11 +100,16 @@
         <div class="bb-step-content">
           <div class="bb-step-heading"><strong>Tạo thiết bị ESP32 ảo</strong><span class="bb-step-badge bb-ota">OTA PROVISIONING</span></div>
           <p>BilaBot yêu cầu máy chủ XiaoZhi cấp mã, tự kiểm tra trạng thái và mở WebSocket sau khi bạn nhập mã ở bước ghép nối.</p>
-          <button type="button" id="bb-pair-start" class="bb-pair-button"><span aria-hidden="true">✳</span> Khởi tạo OTA · Nhận mã kích hoạt <span aria-hidden="true">→</span></button>
-          <div class="bb-code-preview">
-            <span>MÃ KÍCH HOẠT XIAOZHI</span>
-            <strong aria-label="Đang chờ máy chủ cấp mã">— — — — — —</strong>
-            <small>Mã thật chỉ hiển thị khi máy chủ OTA phản hồi thành công.</small>
+          <button type="button" id="bb-pair-start" class="bb-pair-button"><span aria-hidden="true">✳</span> Lấy mã kích hoạt từ XiaoZhi <span aria-hidden="true">→</span></button>
+          <div class="bb-code-preview" id="bb-code-preview" data-phase="idle">
+            <span>MÃ KÍCH HOẠT DO XIAOZHI CẤP</span>
+            <strong id="bb-code-value" aria-live="polite" aria-label="Chưa có mã kích hoạt">— — — — — —</strong>
+            <small id="bb-code-hint">Nhấn Lấy mã. Mã sẽ xuất hiện ngay tại đây khi OTA phản hồi.</small>
+            <div class="bb-code-actions" id="bb-code-actions" hidden>
+              <button type="button" id="bb-copy-code" class="bb-copy-code"><i class="fas fa-copy" aria-hidden="true"></i> Sao chép mã</button>
+              <a id="bb-open-pair-console" href="https://xiaozhi.me/console/agents" target="_blank" rel="noopener noreferrer">Mở XiaoZhi để nhập mã ↗</a>
+            </div>
+            <p class="bb-pair-progress" id="bb-pair-progress" role="status" aria-live="polite">Chờ khởi tạo OTA.</p>
           </div>
         </div>
       </div>
