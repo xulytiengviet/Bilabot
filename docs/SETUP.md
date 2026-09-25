@@ -1,36 +1,68 @@
-# Thiết lập BilaBot GitHub Pages — đăng nhập trên XiaoZhi
+# BilaBot · Thiết lập Google GIS, XiaoZhi và GitHub Pages
 
-BilaBot mở [bảng điều khiển AI Agent chính thức](https://xiaozhi.me/console/agents) để người dùng tự đăng nhập bằng Google **tại XiaoZhi**, sau đó quay lại BilaBot và yêu cầu cấp mã kích hoạt **thật từ OTA của XiaoZhi**. BilaBot không tạo tài khoản Google, không lấy cookie từ xiaozhi.me, không đọc email hay mật khẩu.
+Luồng: Google Identity Services (BilaBot) → đăng nhập riêng trên XiaoZhi → OTA nhận mã thực → ghép nối AI Agent → WebSocket / Opus / STT / TTS / MCP.
 
-## Hai cách kết nối
+**Hai phiên đăng nhập độc lập:** Google GIS chỉ xác thực tại BilaBot. Trang GitHub Pages không thể sử dụng lại cookie, access token hay phiên Google của xiaozhi.me. Chỉ OTA XiaoZhi có quyền cấp mã kích hoạt thiết bị.
 
-| Chế độ | Máy chủ XiaoZhi chính thức | Trình duyệt thuần | Lưu ý |
-|---|---|---|---|
-| Proxy tối giản (mặc định) | Có, sau khi cấu hình Worker | UI/Opus/MCP chạy trong trình duyệt; Worker chỉ gắn custom headers | Cần triển khai Cloudflare Worker, Turnstile và cấp phép domain |
-| Trực tiếp (máy chủ tự quản tương thích) | Không được bảo đảm | Có, **nếu** server chấp nhận CORS cho OTA/vision và một dạng WebSocket authentication không cần custom headers | Không đưa token vào query string để giả lập xác thực chính thức |
+## A. Cấu hình Google Identity Services
 
-**Giới hạn kỹ thuật:** GitHub Pages không thể truy cập cookie đăng nhập Google/XiaoZhi từ một origin khác. Browser `WebSocket` API không hỗ trợ các custom handshake headers `Authorization`, `Device-Id`, `Client-Id`, `Protocol-Version` của thiết bị ESP32. Kết nối trực tiếp máy chủ XiaoZhi chính thức không được tuyên bố hoạt động nếu phía họ chưa cấp API Web OAuth/CORS và cơ chế WebSocket được hỗ trợ. Không sử dụng dịch vụ giả mạo trang đăng nhập.
+1. Vào https://console.cloud.google.com/apis/credentials, thiết lập OAuth consent screen và tạo OAuth 2.0 Client ID loại **Web application**.
+2. Trong **Authorized JavaScript origins**, khai báo chính xác **https://xulytiengviet.github.io**; khi thử trên localhost thêm **http://localhost:5173**. Không nhập đường dẫn /Bilabot vào trường origin.
+3. Điền public Client ID (kết thúc bằng .apps.googleusercontent.com) vào **googleClientId** trong docs/config.js.
+4. Điền chính xác cùng public Client ID vào biến **GOOGLE_CLIENT_ID** trong worker/wrangler.toml.
 
-## Chủ repository: triển khai một lần
+Không bao giờ commit OAuth Client Secret, JWT cá nhân hay cookie. Nút đăng nhập dùng google.accounts.id.initialize() và renderButton(). Google ID token được gửi qua HTTPS tới Worker để xác minh chữ ký từ Google JWKS, audience, issuer và hạn dùng trước khi cấp transport session.
 
-1. Xem [worker/README.md](../worker/README.md), tạo Cloudflare Turnstile widget cho domain `xulytiengviet.github.io`. Thiết lập các biến `TURNSTILE_SITE_KEY` (công khai), secret `TURNSTILE_SECRET`, `SESSION_SECRET` (>=32 ký tự), `TICKET_KEY` (64 chữ số hex).
-2. Chạy `cd worker && npm install && npx wrangler login && npm run deploy`. Sao chép URL `https://bilabot-gateway.<tài-khoản>.workers.dev`.
-3. Sửa `docs/config.js`, điền `workerUrl` công khai. Giữ `mode: 'gateway'`. **Không cần Google OAuth Client ID, OAuth Secret hay mật khẩu XiaoZhi.**
-4. Repository GitHub → Settings → Pages: chọn GitHub Actions. Workflow `.github/workflows/pages.yml` đưa thư mục `docs/` lên `https://xulytiengviet.github.io/Bilabot/`.
+## B. Thiết lập Cloudflare Worker
 
-Nếu chưa triển khai gateway, trang vẫn hiển thị và bạn vẫn có thể vào giao diện BilaBot; **nó sẽ không tự cấp mã thật khi mạng/CORS không đáp ứng**.
+1. Tạo Cloudflare Turnstile widget với hostname xulytiengviet.github.io, điền site key công khai vào TURNSTILE_SITE_KEY trong worker/wrangler.toml.
+2. Giữ PAGE_ORIGIN = "https://xulytiengviet.github.io" và khai báo GOOGLE_CLIENT_ID.
+3. Mở terminal ở thư mục worker và chạy lần lượt:
 
-## Người dùng: ba bước
+    npm install
 
-1. Trên BilaBot, nhấn **Đăng nhập Google trên XiaoZhi**. Liên kết dẫn trực tiếp đến `https://xiaozhi.me/console/agents` (nếu cần, XiaoZhi tự đưa bạn sang trang login).
-2. Quay lại BilaBot, nhấn **Tôi đã đăng nhập · Tạo mã kích hoạt**. BilaBot tạo Device-ID/Client-ID riêng và gọi `POST OTA/check` qua gateway; khi XiaoZhi trả mã kích hoạt, ứng dụng hiển thị mã và tự kiểm tra trạng thái bằng OTA/activate.
-3. Trong trang `/console/agents`, chọn thêm thiết bị và nhập mã. Trên BilaBot, sau khi kích hoạt được xác nhận, WebSocket bắt đầu truyền Opus từ micro; STT/TTS/MCP được xử lý bởi AI Agent bạn đã cấu hình trên XiaoZhi.
+    npx wrangler login
 
-BilaBot không thể lấy danh sách AI Agent hay thông số riêng của tài khoản đang mở trên xiaozhi.me chỉ từ tab trình duyệt. Cấu hình Agent thực hiện trên giao diện **chính thức**, sau đó kết nối thiết bị đã được liên kết.
+    npx wrangler secret put TURNSTILE_SECRET
 
-## Quyền riêng tư và bảo mật
+    npx wrangler secret put SESSION_SECRET
 
-- Cloudflare Turnstile chỉ ngăn abuse trên gateway công cộng; **không thay cho login XiaoZhi** và không xác minh người dùng đã đăng nhập.
-- Gateway phát hành phiên relay HMAC tối đa 1 giờ sau khi Turnstile được xác nhận. Với mỗi WebSocket, proxy cấp vé AES-GCM 60 giây, chỉ cho phép host XiaoZhi trong allowlist; không phát token gốc trong query URL.
-- Worker phải được thiết lập rate limit/WAF. Không ghi raw OTA token, Opus, Google cookie hay hình ảnh vào log.
-- Ở chế độ máy chủ tự quản, phải cấu hình máy chủ tin cậy chủ động cho phép CORS và phương thức xác thực WebSocket cho browser; chế độ này không vượt qua bảo vệ truy cập của XiaoZhi.
+    npx wrangler secret put TICKET_KEY
+
+    npm run deploy
+
+SESSION_SECRET ít nhất 32 ký tự; tạo bằng openssl rand -base64 48. TICKET_KEY đúng 64 ký tự hex; tạo bằng openssl rand -hex 32.
+
+4. Chép URL Worker sau triển khai vào **workerUrl** trong docs/config.js; ví dụ https://bilabot-gateway.YOUR-SUBDOMAIN.workers.dev.
+5. Kiểm tra /api/health bằng request có Origin https://xulytiengviet.github.io; phản hồi cần có ready=true, googleConfigured=true và turnstileSiteKey. Truy cập URL trực tiếp không có Origin có thể nhận HTTP 403 theo thiết kế.
+
+**Bảo vệ:** Worker dùng origin allowlist, Turnstile, xác minh Google ID token, relay session 1 giờ và vé WebSocket AES-GCM ngắn hạn. Chỉ cho phép các endpoint XiaoZhi được chỉ định. Bật thêm Cloudflare WAF/rate limit trước khi sử dụng công khai.
+
+## C. Công bố GitHub Pages
+
+Trong repository → Settings → Pages chọn **GitHub Actions**. Workflow .github/workflows/pages.yml xuất bản thư mục docs trên nhánh main lên https://xulytiengviet.github.io/Bilabot/ .
+
+Kiểm tra cú pháp trước khi đẩy lên GitHub:
+
+    node --check docs/auth.js
+    node --check docs/static/app.js
+    node --check worker/src/index.js
+
+## D. Luồng người dùng
+
+1. Nhấn **Đăng nhập Google** trên BilaBot. Khi Worker xác minh thành công và hoàn tất Turnstile, autoPair=true bắt đầu OTA tự động.
+2. Mở https://xiaozhi.me/console/agents, đăng nhập Google **tại trang chính thức**, chọn thêm thiết bị AI Agent.
+3. BilaBot hiển thị **mã thực** máy chủ OTA trả về. Nhập mã trên XiaoZhi; BilaBot tự thăm dò OTA/activate, kiểm tra lại OTA/check, nhận URL WSS và device token.
+4. Sau ghép nối, trình duyệt sử dụng micro/loa, Opus qua WebSocket, STT/TTS và MCP. Không cần ESP32 vật lý.
+
+Nếu thiếu Worker hoặc sai cấu hình, ứng dụng hiện lỗi và **không tạo mã giả**. Google Client ID chưa điền thì landing vẫn hoạt động ở chế độ xem, chưa có GIS thực. Chế độ direct chỉ dành cho máy chủ tự quản hỗ trợ CORS và xác thực WebSocket từ trình duyệt; không được xem là giải pháp kết nối thẳng với server chính thức.
+
+## E. Khắc phục sự cố và quyền riêng tư
+
+- Google origin_mismatch: origin của OAuth Web Client phải là https://xulytiengviet.github.io, không chứa /Bilabot.
+- Worker 503: thiếu secret hoặc Turnstile site key. Google login lỗi: kiểm tra client ID frontend và Worker phải trùng.
+- Không nhận mã: kiểm tra /api/ota/check và tab Debug; mã chỉ hợp lệ khi chính OTA trả về.
+- WebSocket thất bại: kiểm tra ghép nối, Worker và mã token, vì browser không tự gửi được custom WS headers như ESP32.
+- ID token Google chỉ giữ trong bộ nhớ trang, không ghi vào localStorage hay chuyển tới XiaoZhi. Worker xác minh chữ ký, sessionStorage giữ transport session và hồ sơ đã xác minh; localStorage có thể giữ token thiết bị theo cơ chế ứng dụng. Tránh máy dùng chung.
+
+Xem chính sách quyền riêng tư tại docs/privacy-policy.html và upstream Olivia AI (MIT): https://github.com/roalfb/olivia-ai .
