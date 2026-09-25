@@ -131,3 +131,11 @@ test('quick OTA opens the native XiaoZhi setup and invalid WebSocket settings ca
   assert.equal(t.panel.dataset.pane,'connection');
   assert.match(t.element('bb-db-validation').textContent,/WebSocket/);
 });
+
+test('direct dashboard URL opens assistant settings after app initialization',()=>{
+  const t=mount();
+  t.window.location.hash='#bb-dashboard';
+  t.dispatch('bilabot:app-ready');
+  assert.ok(t.calls.includes('open:assistant-1'));
+  assert.equal(t.panel.dataset.pane,'overview');
+});
