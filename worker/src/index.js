@@ -341,7 +341,7 @@ export default {
       return bad(404, 'Route not found', headers);
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unexpected gateway error';
-      const clientError = /Invalid|Expired|login|session|required|not allowed|large|Unsupported|Malformed|verified|signature|algorithm|Turnstile/i.test(message);
+      const clientError = /Invalid|Expired|login|session|required|not allowed|large|Unsupported|Malformed|verified|signature|algorithm|Turnstile|Google|không hợp lệ|hết hạn|chưa cấu hình/i.test(message);
       return bad(clientError ? 400 : 502, message, headers);
     }
   }
