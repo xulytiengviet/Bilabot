@@ -16,7 +16,12 @@
     mode: saved.mode==='direct'?'direct':(fixed.mode==='direct'?'direct':'gateway')
   };
   let transportSession='', expiresAt=0, healthCache=null, pending=null;
-  const setStatus=message=>{if(ui('bb-auth-status'))ui('bb-auth-status').textContent=message;const pill=ui('bb-server-state');if(pill)pill.textContent=/sẵn sàng|Đăng nhập|Đang yêu cầu/i.test(message)?'Sẵn sàng':'Kiểm tra kết nối';};
+  const setStatus=message=>{if(ui('bb-auth-status'))ui('bb-auth-status').textContent=message;};
+  const setGatewayStatus=(state,message)=>{
+    const pill=ui('bb-server-state'),parent=pill?.parentElement;
+    if(pill)pill.textContent=message;
+    if(parent)parent.dataset.health=state;
+  };
   const showError=message=>{
     const el=ui('bb-auth-error');if(el){el.hidden=false;el.textContent=message;}
     setStatus('Có thể mở giao diện BilaBot để xem nhật ký kết nối và thử lại.');
@@ -27,13 +32,32 @@
       (u.protocol==='http:'&&['localhost','127.0.0.1'].includes(u.hostname));}
     catch{return false;}
   };
-  async function health(){
+  async function health(force=false){
+    if(force)healthCache=null;
     if(healthCache)return healthCache;
-    if(!validBase())throw new Error('Cloudflare Pages chưa được triển khai hoặc chưa cấu hình.');
-    const res=await fetch(settings.workerUrl+'/api/health',{mode:'cors',cache:'no-store'});
-    if(!res.ok)throw new Error('Không truy cập được Worker ('+res.status+').');
-    const data=await res.json();
-    if(!data.ready||!data.turnstileSiteKey)throw new Error('Worker chưa thiết lập bảo vệ Turnstile hoặc các khóa bí mật.');
+    if(!validBase()){
+      setGatewayStatus('error','Chưa có Cloudflare gateway');
+      throw new Error('Để lấy mã OTA thật, cần triển khai Cloudflare Pages và khai báo địa chỉ gateway trong Cấu hình nâng cao.');
+    }
+    setGatewayStatus('checking','Đang kiểm tra Cloudflare gateway…');
+    let res;
+    try{
+      res=await fetch(settings.workerUrl+'/api/health',{mode:'cors',cache:'no-store',
+        signal:typeof AbortSignal?.timeout==='function'?AbortSignal.timeout(12000):undefined});
+    }catch{
+      setGatewayStatus('error','Không truy cập được gateway');
+      throw new Error('Không kết nối được Cloudflare gateway. Kiểm tra URL, CORS và trạng thái triển khai.');
+    }
+    if(!res.ok){
+      setGatewayStatus('error','Gateway trả HTTP '+res.status);
+      throw new Error('Cloudflare gateway không sẵn sàng (HTTP '+res.status+').');
+    }
+    const data=await res.json().catch(()=>({}));
+    if(!data.ready||!data.turnstileSiteKey){
+      setGatewayStatus('error','Gateway chưa cấu hình');
+      throw new Error('Cloudflare gateway chưa có Turnstile hoặc SESSION_SECRET/TICKET_KEY. Xem Hướng dẫn triển khai.');
+    }
+    setGatewayStatus('ready','Cloudflare gateway đã sẵn sàng');
     return(healthCache=data);
   }
   async function challenge(siteKey){
@@ -77,18 +101,44 @@
     })().finally(()=>{pending=null;});
     return pending;
   }
-  let pairingInFlight=null, lastActivationCode='', currentPhase='idle';
+  let pairingInFlight=null,lastActivationCode='',currentPhase='idle';
+  let countdownTimer=null,suppressCancelledError=false;
   const preview=()=>ui('bb-code-preview');
+  function stopCountdown(){
+    if(countdownTimer!==null){clearInterval(countdownTimer);countdownTimer=null;}
+    if(ui('bb-code-expiry'))ui('bb-code-expiry').hidden=true;
+  }
+  function startCountdown(ms){
+    stopCountdown();
+    if(!Number.isFinite(ms)||ms<1000)return;
+    const deadline=Date.now()+Math.min(ms,600000);
+    const update=()=>{
+      const remaining=Math.max(0,Math.ceil((deadline-Date.now())/1000));
+      const el=ui('bb-code-expiry');
+      if(el){el.hidden=false;el.textContent=Math.floor(remaining/60)+':'+String(remaining%60).padStart(2,'0');}
+      if(remaining===0)stopCountdown();
+    };
+    update();countdownTimer=setInterval(update,1000);
+  }
+  const phaseLabels={idle:'CHƯA CÓ MÃ',checking:'ĐANG LẤY MÃ',code:'MÃ OTA THẬT',
+    paired:'ĐÃ GHÉP NỐI',connecting:'KẾT NỐI...',connected:'ĐÃ KẾT NỐI',error:'CẦN KIỂM TRA',
+    cancelled:'ĐÃ HỦY',disconnected:'MẤT KẾT NỐI'};
   function pairProgress(phase,message){
     currentPhase=phase;
     if(preview())preview().dataset.phase=phase;
+    if(ui('bb-setup'))ui('bb-setup').dataset.phase=phase;
+    if(ui('bb-code-state'))ui('bb-code-state').textContent=phaseLabels[phase]||'BILABOT';
     if(ui('bb-pair-progress'))ui('bb-pair-progress').textContent=message;
+    if(ui('bb-preview-status'))ui('bb-preview-status').textContent=
+      phase==='connected'?'Đã kết nối':phase==='paired'?'Đã ghép nối':
+      phase==='code'?'Chờ nhập mã':phase==='checking'?'Đang cấp mã':'Chưa kết nối';
+    if(ui('bb-cancel-pair'))ui('bb-cancel-pair').hidden=phase!=='code';
     setStatus(message);
   }
   function handlePairingEvent(event){
     const d=event?.detail||{}, phase=d.phase;
     if(phase==='checking'){
-      lastActivationCode='';
+      stopCountdown();lastActivationCode='';suppressCancelledError=false;
       if(ui('bb-code-value'))ui('bb-code-value').textContent='— — — — — —';
       if(ui('bb-code-hint'))ui('bb-code-hint').textContent='Đang yêu cầu mã thật từ máy chủ OTA…';
       if(ui('bb-code-actions'))ui('bb-code-actions').hidden=true;
@@ -101,21 +151,38 @@
       if(ui('bb-code-value')){ui('bb-code-value').textContent=code;ui('bb-code-value').setAttribute('aria-label','Mã kích hoạt '+code);}
       if(ui('bb-code-hint'))ui('bb-code-hint').textContent='Sao chép mã, mở XiaoZhi → AI Agents → thêm thiết bị và nhập mã này.';
       if(ui('bb-code-actions'))ui('bb-code-actions').hidden=false;
-      pairProgress('code','Đã nhận mã OTA. Đang tự kiểm tra ghép nối sau mỗi 3 giây…');
+      pairProgress('code','Mã thật đã sẵn sàng. Dán mã vào AI Agent trên XiaoZhi; BilaBot tự kiểm tra ghép nối.');
+      startCountdown(Number(d.timeoutMs)||300000);
     }else if(phase==='paired'){
+      stopCountdown();
       pairProgress('paired','XiaoZhi đã xác nhận ghép nối! Đang thiết lập kết nối giọng nói…');
       if(ui('bb-code-hint'))ui('bb-code-hint').textContent='Mã đã được xác nhận. Đang kết nối WebSocket…';
     }else if(phase==='connecting'){
       pairProgress('connecting','Đang chờ XiaoZhi xác nhận kết nối WebSocket…');
     }else if(phase==='connected'){
+      stopCountdown();
       pairProgress('connected','Đã kết nối XiaoZhi. Đang mở giao diện BilaBot…');
       if(ui('bb-code-hint'))ui('bb-code-hint').textContent='Thiết bị đã hoạt động. Nhấn micro để cấp quyền và bắt đầu trò chuyện.';
       if(ui('bb-pair-start'))ui('bb-pair-start').disabled=false;
       setTimeout(()=>document.body.classList.add('bilabot-open'),700);
     }else if(phase==='disconnected'){
-      if(currentPhase!=='connected'&&currentPhase!=='error')
+      if(currentPhase==='connected'){
+        pairProgress('disconnected','WebSocket đã ngắt; mở trò chuyện và nhấn Kết nối để thử lại.');
+      }else if(currentPhase!=='error'&&currentPhase!=='cancelled'){
         handlePairingEvent({detail:{phase:'error',message:d.message||'XiaoZhi đóng WebSocket trước khi xác nhận kết nối.'}});
+      }
+    }else if(phase==='cancelled'){
+      stopCountdown();lastActivationCode='';
+      if(ui('bb-code-actions'))ui('bb-code-actions').hidden=true;
+      if(ui('bb-code-value'))ui('bb-code-value').textContent='— — — — — —';
+      if(ui('bb-code-hint'))ui('bb-code-hint').textContent='Bạn có thể nhấn Lấy mã để bắt đầu lại.';
+      pairProgress('cancelled','Đã hủy ghép nối. Bạn có thể lấy mã mới khi sẵn sàng.');
+      if(ui('bb-pair-start'))ui('bb-pair-start').disabled=false;
     }else if(phase==='error'){
+      if(suppressCancelledError&&/hủy ghép nối|cancelled/i.test(String(d.message||''))){
+        suppressCancelledError=false;return;
+      }
+      stopCountdown();
       const message=String(d.message||'Không thể lấy mã hoặc kết nối tới XiaoZhi.');
       pairProgress('error',message);
       showError(message);
@@ -161,6 +228,16 @@
     }
   });
   ui('bb-pair-start')?.addEventListener('click',startPair);
+  ui('bb-cancel-pair')?.addEventListener('click',()=>{
+    suppressCancelledError=true;
+    try{window.XiaozhiDebug?.provisioning?.cancel();}catch{}
+    handlePairingEvent({detail:{phase:'cancelled'}});
+  });
+  ui('bb-health-check')?.addEventListener('click',async()=>{
+    hideError();
+    try{await health(true);setStatus('Cloudflare gateway đã sẵn sàng; có thể lấy mã OTA thực.');}
+    catch(e){showError(e.message);}
+  });
   ui('bb-open-app')?.addEventListener('click',()=>document.body.classList.add('bilabot-open'));
   ui('bb-return-home')?.addEventListener('click',()=>document.body.classList.remove('bilabot-open'));
   ui('bb-save-config')?.addEventListener('click',()=>{
@@ -173,9 +250,19 @@
   });
   if(ui('bb-api-input'))ui('bb-api-input').value=settings.workerUrl;
   if(ui('bb-relay-mode'))ui('bb-relay-mode').value=settings.mode;
-  if(settings.mode==='direct')setStatus('Chế độ trực tiếp: chỉ dùng với máy chủ cho phép CORS và không yêu cầu custom WebSocket headers.');
-  else if(!validBase())setStatus('GitHub Pages đang chờ địa chỉ Cloudflare Pages. Bạn vẫn có thể xem giao diện BilaBot.');
-  else setStatus('Đăng nhập trên XiaoZhi, sau đó nhấn Tạo mã kích hoạt.');
+  if(settings.mode==='direct'){
+    setGatewayStatus('ready','Máy chủ tự quản (chế độ trực tiếp)');
+    setStatus('Chỉ dùng trực tiếp với máy chủ hỗ trợ CORS và không yêu cầu header WebSocket tùy chỉnh.');
+  }else if(!validBase()){
+    setGatewayStatus('error','Chưa cấu hình Cloudflare gateway');
+    setStatus('GitHub Pages chỉ có giao diện. Vào Cấu hình nâng cao để nhập gateway Cloudflare Pages của bạn.');
+  }else{
+    setGatewayStatus('checking','Đang kiểm tra gateway…');
+    setStatus('Mở XiaoZhi.me, đăng nhập và chuẩn bị nhận mã OTA.');
+    if(typeof window.fetch==='function')
+      health().then(()=>setStatus('Gateway đã sẵn sàng. Nhấn Lấy mã kích hoạt để bắt đầu.'))
+        .catch(e=>{setStatus(e.message);});
+  }
   window.BilaBotBridge={
     get mode(){return settings.mode;},
     get apiBase(){return settings.workerUrl;},
