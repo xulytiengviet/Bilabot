@@ -4890,10 +4890,12 @@ const UIController = (() => {
     settingsTargetId = assistantId;
     loadSettingsIntoForm();
     el('settingsPanel').classList.add('open');
+    window.dispatchEvent(new CustomEvent('bilabot:settings-open',{detail:{assistantId}}));
   }
 
   function closeSettings() {
     el('settingsPanel').classList.remove('open');
+    window.dispatchEvent(new CustomEvent('bilabot:settings-close'));
     // Revert to "always follow the active assistant" once the panel closes.
     settingsTargetId = null;
   }
@@ -5039,20 +5041,20 @@ const UIController = (() => {
     if (!a) return;
 
     if (AssistantManager.getAllAssistants().length <= 1) {
-      showToast('Cannot delete the last remaining assistant', 'error');
+      showToast('Không thể xóa trợ lý cuối cùng.', 'error');
       return;
     }
 
-    if (!confirm(`Delete "${a.name}"? This disconnects it and permanently removes its chat history, pairing, and settings.`)) {
+    if (!confirm(`Xóa trợ lý "${a.name}"? Thao tác này sẽ ngắt kết nối và xóa vĩnh viễn lịch sử, ghép nối và cài đặt của trợ lý.`)) {
       return;
     }
 
     const deleted = SessionManager.deleteAssistant(id);
     if (deleted) {
       closeSettings();
-      showToast(`"${a.name}" deleted`, 'info');
+      showToast(`Đã xóa trợ lý "${a.name}"`, 'info');
     } else {
-      showToast('Could not delete assistant', 'error');
+      showToast('Không thể xóa trợ lý.', 'error');
     }
   }
 
@@ -5060,7 +5062,7 @@ const UIController = (() => {
     const id = getSettingsTargetId();
     const wsUrl = el('wsUrlInput').value.trim();
     if (!wsUrl) {
-      showToast('WebSocket URL is required', 'error');
+      showToast('Bạn cần nhập địa chỉ WebSocket.', 'error');
       return;
     }
 
@@ -5094,15 +5096,15 @@ const UIController = (() => {
     // BRAND UPDATE: deviceNameDisplay is now the BilaBot Wordmark logo (CSS mask) — no text injection needed.
 
     closeSettings();
-    showToast('Settings saved', 'success');
+    showToast('Đã lưu cài đặt trợ lý', 'success');
     Logger.info('Settings updated');
   }
 
   function resetSettings() {
-    if (!confirm('Reset all settings to defaults? This will generate new device IDs.')) return;
+    if (!confirm('Khôi phục tất cả cài đặt mặc định? Thao tác này sẽ tạo lại mã thiết bị và có thể yêu cầu ghép nối mới.')) return;
     AssistantManager.resetById(getSettingsTargetId());
     loadSettingsIntoForm();
-    showToast('Settings reset to defaults', 'info');
+    showToast('Đã khôi phục cài đặt mặc định', 'info');
     Logger.info('Settings reset');
   }
 
@@ -6260,7 +6262,8 @@ const BackupSystem = (() => {
 
     if (globalSettingsBtn && globalSettingsPanel) {
       globalSettingsBtn.addEventListener('click', () => {
-        globalSettingsPanel.classList.toggle('open');
+        UIController.openSettingsFor(AssistantManager.getActiveId());
+        window.BilaBotDashboard?.activate('data');
         updateLastBackupDisplay();
       });
     }
