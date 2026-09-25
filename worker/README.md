@@ -1,57 +1,45 @@
-# Cloudflare Worker tối giản cho BilaBot (không đăng nhập Google lần hai)
+# BilaBot Cloudflare Worker · Google GIS + XiaoZhi
 
-Người dùng đăng nhập Google **chỉ tại** [xiaozhi.me/console/agents](https://xiaozhi.me/console/agents). Worker không nhận cookie của trang này, không lấy access token Google, không truy cập Gmail và không cấp mã kích hoạt XiaoZhi. Đây chỉ là cầu nối giao thức thiết bị cho browser và bảo vệ bằng **Cloudflare Turnstile** chống truy cập ồ ạt.
+Worker này chỉ là **cổng xác thực và chuyển tiếp giao thức thiết bị**. Google ID token chỉ dùng để xác minh danh tính đăng nhập BilaBot, không được dùng làm XiaoZhi OAuth token. Người dùng vẫn đăng nhập tại https://xiaozhi.me/console/agents, sau đó nhập mã OTA do XiaoZhi thực sự cấp.
 
-## Vì sao cần Worker khi kết nối XiaoZhi chính thức?
+## Tại sao cần Worker?
 
-ESP32 gửi OTA với `Activation-Version`, `Device-Id`, `Client-Id`; WebSocket yêu cầu custom `Authorization`, `Protocol-Version`, `Device-Id`, `Client-Id`. Browser thông thường không tự tạo được tất cả handshake headers trên WebSocket, còn CORS có thể chặn OTA/vision từ GitHub Pages. Worker chỉ chuyển tiếp các request này, còn Opus, UI, MCP vẫn ở phía trình duyệt.
+GitHub Pages chỉ phục vụ HTML/CSS/JS tĩnh; browser không tự gửi được các header Authorization, Protocol-Version, Device-Id và Client-Id khi bắt tay WebSocket. XiaoZhi OTA/vision cũng có thể chặn truy cập CORS từ browser. Worker tạo phiên relay có Turnstile + Google GIS, cho phép OTA, thêm header WSS và trả luồng âm thanh nguyên trạng; frontend vẫn xử lý UI, Opus WASM, micro, loa và MCP.
 
-## Thiết lập Cloudflare
+## Cấu hình một lần
 
-1. Trên Cloudflare Turnstile, tạo site với hostname `xulytiengviet.github.io`. Sao chép **site key** (công khai) và **secret key** (bí mật).
-2. Điền `TURNSTILE_SITE_KEY` công khai vào `worker/wrangler.toml`:
-   ```toml
-   [vars]
-   PAGE_ORIGIN = "https://xulytiengviet.github.io"
-   TURNSTILE_SITE_KEY = "YOUR_PUBLIC_TURNSTILE_SITE_KEY"
-   ```
-3. Trong thư mục `worker/`:
-   ```bash
-   npm install
-   npx wrangler login
-   npx wrangler secret put TURNSTILE_SECRET
-   npx wrangler secret put SESSION_SECRET
-   npx wrangler secret put TICKET_KEY
-   npm run deploy
-   ```
-   `SESSION_SECRET` phải dài tối thiểu 32 ký tự, có thể tạo bằng `openssl rand -base64 48`. `TICKET_KEY` là chuỗi 64 ký tự HEX tạo bằng `openssl rand -hex 32`.
-4. Chép URL Worker công khai vào `docs/config.js`:
-   ```js
-   window.BILABOT_CONFIG = Object.freeze({
-     workerUrl: 'https://bilabot-gateway.YOUR-SUBDOMAIN.workers.dev',
-     mode: 'gateway',
-     autoPair: false
-   });
-   ```
-5. Bật GitHub Pages (Actions) trên repository. Người dùng không cần điền bất cứ khóa hay client ID nào.
+1. Google Cloud Console → OAuth Web Client. Authorized JavaScript Origin: https://xulytiengviet.github.io. Chép Client ID công khai, không chép client secret.
+2. Cloudflare Turnstile → thêm hostname xulytiengviet.github.io, lấy site key công khai và secret riêng.
+3. Mở worker/wrangler.toml, điền PAGE_ORIGIN, GOOGLE_CLIENT_ID và TURNSTILE_SITE_KEY.
+4. Cài đặt và khai báo secret:
 
-## Luồng xác thực và truyền dữ liệu
+    npm install
+    npx wrangler login
+    npx wrangler secret put TURNSTILE_SECRET
+    npx wrangler secret put SESSION_SECRET
+    npx wrangler secret put TICKET_KEY
+    npm run deploy
 
-```text
-[XiaoZhi official Google login] -- riêng trên xiaozhi.me/console/agents
-[BilaBot GitHub Pages] -- Cloudflare Turnstile --> [BilaBot Worker]
-[Worker] -- Session HMAC 1 giờ --> [Browser]
-[Browser] -- OTA check (Device-ID/Client-ID) --> [Worker] --> [XiaoZhi OTA]
-[XiaoZhi OTA] -- activation.code --> [BilaBot hiện mã]
-[User] -- nhập mã trên xiaozhi.me/console/agents --> [XiaoZhi kích hoạt thiết bị]
-[BilaBot] -- OTA activate/check --> [XiaoZhi cấp token thiết bị, WSS URL]
-[BilaBot] -- WS ticket AES-GCM 60s --> [Worker] --> [XiaoZhi WSS với header]
-```
+SESSION_SECRET tối thiểu 32 ký tự (ví dụ openssl rand -base64 48); TICKET_KEY đúng 64 ký tự hex (openssl rand -hex 32). Không đưa secret vào GitHub.
 
-Người dùng thấy mã **chỉ khi máy chủ OTA trả mã thật**. Không tạo mã ngẫu nhiên giả lập. Worker không thể tự biết người dùng đã đăng nhập Google trên tab khác.
+5. Điền URL Worker và cùng Google Client ID trong docs/config.js, mở GitHub Pages. Kiểm tra /api/health bằng request với Origin của GitHub Pages; ready và googleConfigured phải true.
 
-## Giới hạn bảo mật
+## Security design
 
-Origin check không phải cơ chế chống lạm dụng duy nhất; Cloudflare Turnstile được bắt buộc trước khi cấp session. Thiết lập thêm WAF/rate limits cho `/api/auth/session`, `/api/ota/*`, `/api/ws-ticket` và WebSocket; tránh ghi secrets và payload vào access logs. Token thiết bị nằm ở trình duyệt và Worker nhận ngắn hạn để tạo header cho endpoint chính thức. Sử dụng HTTPS, không chia sẻ mã và token trên máy công cộng.
+- Worker kiểm tra origin allowlist và xác minh Turnstile trước khi cấp session.
+- Nếu GOOGLE_CLIENT_ID được đặt, Worker **bắt buộc** có Google ID token hợp lệ; xác minh chữ ký RS256 qua Google JWK được cache tối đa 1 giờ, kiểm tra aud/iss/exp/iat.
+- Transport session HMAC hết hạn sau 1 giờ, WebSocket ticket AES-GCM sau 60 giây; không đặt device token thô trong query string.
+- OTA/WSS/vision có allowlist upstream. Bật Cloudflare WAF/rate limiting; không lưu log request body, token, audio hay ảnh.
+- Google ID token chỉ tồn tại trong memory của tab, được gửi qua HTTPS tới Worker, không chuyển sang XiaoZhi hoặc lưu trong localStorage.
+- Origin checking và Turnstile không thay cho xác thực tài khoản XiaoZhi; chính XiaoZhi quản lý AI Agent và kích hoạt thiết bị.
 
-Để vận hành hoàn toàn **không gateway**, cần máy chủ XiaoZhi tương thích với browser, công khai CORS và cơ chế xác thực qua WebSocket API trình duyệt; phiên cookie trên xiaozhi.me không thể chia sẻ với github.io.
+## API
+
+- GET /api/health: ready, googleConfigured, turnstileSiteKey, version.
+- POST /api/auth/session: body có turnstileToken và googleIdToken khi bật GIS, trả relay session + hồ sơ đã xác minh.
+- GET /api/me: kiểm tra relay session.
+- POST /api/ota/check và /api/ota/activate: chuyển tiếp OTA với device identity.
+- POST /api/ws-ticket và GET /api/ws: cấp vé ngắn hạn, chuyển tiếp WebSocket và gắn custom headers.
+- POST /api/vision/explain: chuyển tiếp ảnh khi người dùng đồng ý.
+
+Tài liệu cài đặt chi tiết: ../docs/SETUP.md.
