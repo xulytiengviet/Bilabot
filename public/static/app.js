@@ -2814,6 +2814,26 @@ const ProtocolClient = (() => {
         }
       ] : [];
 
+      // BilaBot browser-specific MCP: read-only connection status and
+      // per-assistant speaker volume. No file, shell, or cross-origin access.
+      const browserTools = [
+        {
+          name: 'self.browser.get_status',
+          description: 'Lấy trạng thái kết nối và âm lượng hiện tại của BilaBot trên trình duyệt.',
+          inputSchema: { type: 'object', properties: {}, additionalProperties: false }
+        },
+        {
+          name: 'self.audio_speaker.set_volume',
+          description: 'Đặt âm lượng phát TTS của BilaBot; volume là phần trăm 0 đến 100.',
+          inputSchema: {
+            type: 'object',
+            properties: { volume: { type: 'number', minimum: 0, maximum: 100 } },
+            required: ['volume'],
+            additionalProperties: false
+          }
+        }
+      ];
+
       const response = {
         session_id: sessionId,
         type: 'mcp',
@@ -2821,12 +2841,12 @@ const ProtocolClient = (() => {
           jsonrpc: '2.0',
           id: msg.payload.id,
           result: {
-            tools: cameraTools,
+            tools: cameraTools.concat(browserTools),
           }
         }
       };
       sendText(response);
-      Logger.mcp(`→ MCP tools/list response (${cameraTools.length} tool(s))`, null);
+      Logger.mcp(`→ MCP tools/list response (${cameraTools.length + browserTools.length} tool(s))`, null);
     } else if (msg.payload && msg.payload.method === 'tools/call') {
       // ── Official firmware reference: McpServer::DoToolCall() ────────────
       // mcp_server.cc lines 508–559: firmware dispatches tools/call to the
@@ -3026,6 +3046,39 @@ const ProtocolClient = (() => {
           }
         })();
 
+      } else if (toolName === 'self.browser.get_status') {
+        const status = {
+          app: 'BilaBot',
+          state: deviceEmulator.getState(),
+          page: location.origin + location.pathname,
+          volume_percent: Math.round(VolumeSystem.getVolume(assistantId) * 100)
+        };
+        sendText({
+          session_id: sessionId, type: 'mcp',
+          payload: { jsonrpc: '2.0', id: toolId, result: {
+            content: [{ type: 'text', text: JSON.stringify(status) }], isError: false
+          }}
+        });
+      } else if (toolName === 'self.audio_speaker.set_volume') {
+        const value = toolArgs.volume;
+        if (typeof value !== 'number' || !Number.isFinite(value) || value < 0 || value > 100) {
+          sendText({
+            session_id: sessionId, type: 'mcp',
+            payload: { jsonrpc: '2.0', id: toolId, result: {
+              content: [{ type: 'text', text: 'volume phải là số từ 0 đến 100.' }],
+              isError: true
+            }}
+          });
+        } else {
+          const applied = Math.round(VolumeSystem.setVolume(assistantId, value / 100) * 100);
+          sendText({
+            session_id: sessionId, type: 'mcp',
+            payload: { jsonrpc: '2.0', id: toolId, result: {
+              content: [{ type: 'text', text: 'Đã đặt âm lượng BilaBot: ' + applied + '%.' }],
+              isError: false
+            }}
+          });
+        }
       } else {
         // Unknown tool — reply with JSON-RPC error (unchanged behavior for other tools)
         const response = {
