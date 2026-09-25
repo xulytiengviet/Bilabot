@@ -32,6 +32,8 @@ Bản chạy local cần secrets thử nghiệm riêng bằng `.dev.vars` (khôn
 ## Người dùng: hai thao tác
 
 1. Mở https://xiaozhi.me/console/agents, đăng nhập Google trên trang chính thức và chọn AI Agent để thêm thiết bị.
-2. Vào BilaBot → **Tạo mã kích hoạt**, nhập mã OTA thực do BilaBot nhận được vào bảng điều khiển XiaoZhi. Sau ghép nối, ứng dụng chuyển âm thanh Opus/WASM, STT/TTS và MCP qua proxy Hono cùng tên miền. Không cần ESP32 vật lý.
+2. Vào BilaBot → **Lấy mã kích hoạt từ XiaoZhi**. Mã OTA thực sẽ hiển thị ngay tại phần thiết lập `#bb-setup`. Nhấn **Sao chép mã**, quay lại XiaoZhi → AI Agents → **Thêm thiết bị**, dán mã và xác nhận. BilaBot tự kiểm tra kết quả khoảng mỗi 3 giây và tự mở giao diện trò chuyện sau khi nhận được phản hồi hello từ WebSocket. Để dùng giọng nói, cấp quyền micro khi trình duyệt hỏi. Không cần ESP32 vật lý.
+
+**Nếu chưa thấy mã:** kiểm tra `/api/health` trên địa chỉ Cloudflare Pages có `ready:true` và Turnstile hoạt động. Nếu OTA không trả `activation.code` (đặc biệt khi chỉ trả `test-token`/`GID_test`), BilaBot sẽ hiển thị lỗi thay vì giả vờ đã ghép nối. Không nhập mã ngẫu nhiên và không chia sẻ token thiết bị.
 
 **Mã nguồn:** `docs/` là UI dùng chung, `cloudflare/src/index.js` là Hono Pages Advanced Mode, `worker/src/index.js` là lõi OTA/WebSocket/vision tái sử dụng, `dist/_worker.js` là bundle deploy. GitHub Pages thuần không thể thực thi Hono; điểm truy cập GitHub sẽ chuyển hướng sau khi bạn khai báo địa chỉ Cloudflare thật.
