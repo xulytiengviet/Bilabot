@@ -167,7 +167,12 @@
       pairProgress('connected','Đã kết nối XiaoZhi. Đang mở giao diện BilaBot…');
       if(ui('bb-code-hint'))ui('bb-code-hint').textContent='Thiết bị đã hoạt động. Nhấn micro để cấp quyền và bắt đầu trò chuyện.';
       if(ui('bb-pair-start'))ui('bb-pair-start').disabled=false;
-      setTimeout(()=>{if(currentPhase==='connected')document.body.classList.add('bilabot-open');},700);
+      setTimeout(()=>{
+        if(currentPhase==='connected'){
+          document.body.classList.add('bilabot-open');
+          window.BilaBotDirect?.closeSetup?.({ restoreFocus: false });
+        }
+      },700);
     }else if(phase==='disconnected'){
       if(currentPhase==='connected'){
         pairProgress('disconnected','WebSocket đã ngắt; mở trò chuyện và nhấn Kết nối để thử lại.');
@@ -247,7 +252,8 @@
     catch(e){showError(e.message);}
   });
   ui('bb-open-app')?.addEventListener('click',()=>document.body.classList.add('bilabot-open'));
-  ui('bb-return-home')?.addEventListener('click',()=>document.body.classList.remove('bilabot-open'));
+  // Direct setup owns #bb-return-home; never hide the actual Olivia app.
+  // The assistant UI remains accessible while the OTA drawer is open.
   ui('bb-save-config')?.addEventListener('click',()=>{
     const url=ui('bb-api-input').value.trim().replace(/\/+$/,'');
     const mode=ui('bb-relay-mode').value;
@@ -275,6 +281,9 @@
     get mode(){return settings.mode;},
     get apiBase(){return settings.workerUrl;},
     get sessionToken(){return transportSession&&expiresAt>Date.now()+10_000?transportSession:'';},
-    ensureSession, startPair, official
+    ensureSession, startPair, official,
+    get isSetupOpen(){return Boolean(window.BilaBotDirect?.isOpen?.());},
+    openSetup(){window.BilaBotDirect?.openSetup?.();},
+    closeSetup(){window.BilaBotDirect?.closeSetup?.();}
   };
 })();
