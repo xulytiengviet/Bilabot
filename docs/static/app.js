@@ -1773,12 +1773,11 @@ const ProvisioningManager = (() => {
                   pollTimerId = setTimeout(poll, 3000);
                 }
               } catch (otaErr) {
-                // OTA check failed after activation — still mark as paired since
-                // activate returned 200. Use token we already have.
-                Logger.warn('Post-activation OTA check failed, proceeding with cached token', otaErr.message);
-                set('paired', true);
-                setState(PAIRING_STATES.PAIRED);
-                resolve(true);
+                // A successful activate response alone does not prove that
+                // this device has received a usable WebSocket configuration.
+                Logger.warn('Post-activation OTA check failed', otaErr.message);
+                setState(PAIRING_STATES.FAILED);
+                reject(new Error('XiaoZhi đã nhận mã nhưng chưa kiểm tra lại được OTA: ' + otaErr.message));
               }
               return;
             }
@@ -1826,11 +1825,11 @@ const ProvisioningManager = (() => {
           Logger.auth('Device already registered (no activation code in OTA response)');
           return { needsUserAction: false };
         }
-        // Has no activation and no token — shouldn't happen but handle gracefully
-        Logger.warn('OTA response has no activation block and no token — proceeding anyway');
-        set('paired', true);
-        setState(PAIRING_STATES.PAIRED);
-        return { needsUserAction: false };
+        // Missing activation on a new device can be an OTA test account.
+        // Never claim successful pairing without either a previous trusted
+        // pairing or a completed activate→check confirmation.
+        setState(PAIRING_STATES.FAILED);
+        throw new Error('OTA chưa cấp mã kích hoạt cho thiết bị mới. Nếu server trả test-token/GID_test, hãy kiểm tra máy chủ XiaoZhi và thử tạo lại thiết bị.');
       }
 
       // Server requires activation — show the code to the user.
@@ -4091,6 +4090,7 @@ const SessionManager = (() => {
       Logger.ws(`[${assistantId.slice(0, 8)}] Connected! Session ID: ${sessionId}`);
       AssistantManager.setConnectionStatus(assistantId, 'connected');
       if (isActiveId(assistantId)) {
+        window.dispatchEvent(new CustomEvent('bilabot:pairing', { detail: { phase: 'connected', assistantId } }));
         UIController.setConnectionState('connected');
         UIController.updateSessionId(sessionId);
         UIController.addSystemMessage(
@@ -4120,6 +4120,7 @@ const SessionManager = (() => {
 
     protocol.on('error', (message) => {
       Logger.error(`[${assistantId.slice(0, 8)}] Protocol error`, message);
+      if (isActiveId(assistantId)) window.dispatchEvent(new CustomEvent('bilabot:pairing', { detail: { phase: 'error', assistantId, message } }));
       AssistantManager.setConnectionStatus(assistantId, 'disconnected');
       if (isActiveId(assistantId)) {
         UIController.setConnectionState('disconnected');
@@ -4257,8 +4258,14 @@ const SessionManager = (() => {
     const id = assistantId || AssistantManager.getActiveId();
     const session = getOrCreateSession(id);
     const { deviceEmulator, provisioning, protocol } = session;
+    const reportPairing = (phase, detail = {}) => {
+      if (isActiveId(id)) window.dispatchEvent(new CustomEvent('bilabot:pairing', {
+        detail: { phase, assistantId: id, ...detail }
+      }));
+    };
 
     if (protocol.isConnected() || protocol.isConnecting()) {
+      reportPairing(protocol.isConnected() ? 'connected' : 'connecting');
       if (isActiveId(id)) showToast('Already connected or connecting', 'warning');
       return;
     }
@@ -4266,9 +4273,11 @@ const SessionManager = (() => {
     const wsUrl = AssistantManager.getFlatField(id, 'wsUrl');
     if (!wsUrl) {
       if (isActiveId(id)) showToast('Please configure the WebSocket URL in Settings', 'error');
+      reportPairing('error', { message: 'Chưa có địa chỉ WebSocket; hãy kiểm tra cấu hình trợ lý.' });
       return;
     }
 
+    reportPairing('checking');
     Logger.ws(`[${id.slice(0, 8)}] User initiated connection...`);
     deviceEmulator.setState(deviceEmulator.STATES.CONNECTING);
 
@@ -4283,6 +4292,7 @@ const SessionManager = (() => {
         const result = await provisioning.provision();
 
         if (result.needsUserAction) {
+          reportPairing('code', { code: result.code, message: result.message, timeoutMs: result.timeoutMs });
           if (isActiveId(id)) {
             UIController.showPairingModal(result.code, result.message);
             UIController.addSystemMessage(
@@ -4292,6 +4302,7 @@ const SessionManager = (() => {
           }
 
           await provisioning.waitForActivation();
+          reportPairing('paired');
 
           if (isActiveId(id)) {
             UIController.hidePairingModal();
@@ -4305,6 +4316,7 @@ const SessionManager = (() => {
         try {
           const refreshResult = await provisioning.provision(true); // silent=true
           if (refreshResult.needsUserAction) {
+            reportPairing('code', { code: refreshResult.code, message: refreshResult.message, timeoutMs: refreshResult.timeoutMs });
             Logger.warn(`[${id.slice(0, 8)}] Previously paired device now requires re-activation`);
             AssistantManager.clearPairingById(id);
             if (isActiveId(id)) {
@@ -4315,6 +4327,7 @@ const SessionManager = (() => {
               );
             }
             await provisioning.waitForActivation();
+            reportPairing('paired');
             if (isActiveId(id)) {
               UIController.hidePairingModal();
               UIController.addSystemMessage('Device re-paired successfully!', 'fa-circle-check');
@@ -4328,10 +4341,12 @@ const SessionManager = (() => {
       }
 
       // Step 2: Connect WebSocket with token from OTA.
+      reportPairing('connecting');
       const token = AssistantManager.getFlatField(id, 'token');
       Logger.auth(`[${id.slice(0, 8)}] Connecting with token: ${token ? '***' + token.slice(-4) : '(none)'}`);
       const ok = await protocol.connect();
       if (!ok) {
+        reportPairing('error', { message: 'Không mở được WebSocket XiaoZhi; kiểm tra proxy Hono và token thiết bị.' });
         deviceEmulator.setState(deviceEmulator.STATES.ERROR, 'connect failed');
         AssistantManager.setConnectionStatus(id, 'disconnected');
         if (isActiveId(id)) {
@@ -4340,6 +4355,7 @@ const SessionManager = (() => {
         }
       }
     } catch (err) {
+      reportPairing('error', { message: err.message || 'Không thể kích hoạt thiết bị.' });
       Logger.error(`[${id.slice(0, 8)}] Connect/provision failed`, err.message);
       provisioning.cancel();
       deviceEmulator.setState(deviceEmulator.STATES.ERROR, 'provisioning failed');
