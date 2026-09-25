@@ -1735,7 +1735,7 @@ const ProvisioningManager = (() => {
 
         async function poll() {
           if (pollAbort) {
-            reject(new Error('Pairing cancelled'));
+            reject(new Error('Đã hủy ghép nối'));
             return;
           }
 
@@ -4923,10 +4923,10 @@ const UIController = (() => {
     const display = el('pairingStatusDisplay');
     if (!display) return;
     if (AssistantManager.isPairedById(getSettingsTargetId())) {
-      display.textContent = 'Paired ✓';
+      display.textContent = 'Đã ghép nối ✓';
       display.className = 'pairing-status-display paired';
     } else {
-      display.textContent = 'Not paired — click Connect to activate';
+      display.textContent = 'Chưa ghép nối — nhấn Kết nối để kích hoạt';
       display.className = 'pairing-status-display unpaired';
     }
   }
@@ -4938,11 +4938,11 @@ const UIController = (() => {
     if (!statusText) return;
 
     const labels = {
-      unpaired:        'Registering device...',
-      pairing_pending: 'Waiting for you to enter code at xiaozhi.me...',
-      paired:          'Paired successfully!',
-      failed:          'Pairing failed',
-      expired:         'Activation code expired',
+      unpaired:        'Đang đăng ký thiết bị với XiaoZhi…',
+      pairing_pending: 'Nhập mã đang hiển thị tại xiaozhi.me để ghép nối…',
+      paired:          'Thiết bị đã ghép nối thành công!',
+      failed:          'Ghép nối thất bại',
+      expired:         'Mã kích hoạt đã hết hạn',
     };
     statusText.textContent = labels[state] || state;
 
@@ -4983,7 +4983,7 @@ const UIController = (() => {
   function copyPairingCode() {
     const code = el('pairingCodeDisplay')?.textContent?.trim();
     if (!code || code === '------') return;
-    navigator.clipboard.writeText(code).then(() => showToast('Code copied', 'success'));
+    navigator.clipboard.writeText(code).then(() => showToast('Đã sao chép mã kích hoạt', 'success'));
   }
 
   function cancelPairing() {
@@ -4995,10 +4995,10 @@ const UIController = (() => {
   }
 
   function resetPairing() {
-    if (!confirm('Reset pairing? You will need to activate again at xiaozhi.me.')) return;
+    if (!confirm('Đặt lại ghép nối? Bạn cần nhập lại mã kích hoạt trên xiaozhi.me.')) return;
     AssistantManager.clearPairingById(getSettingsTargetId());
     updatePairingStatusDisplay();
-    showToast('Pairing reset', 'info');
+    showToast('Đã đặt lại ghép nối', 'info');
     Logger.auth('Pairing cleared by user');
   }
 
