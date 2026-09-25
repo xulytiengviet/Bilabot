@@ -39,6 +39,7 @@ jobs:
           node --check worker/src/index.js
           node --test worker/tests/*.test.mjs
           test -f docs/index.html
+          test -f docs/olivia-theme.css
           test -f docs/.nojekyll
       - uses: actions/setup-node@v4
         with:
