@@ -1,18 +1,28 @@
-/** Shared Cloudflare Pages application and optional GitHub Pages entry.
- * Both UI and Hono gateway have the same origin on Cloudflare Pages.
- * No Google GIS or XiaoZhi website cookie access is needed.
+/** Public BilaBot gateway configuration.
+ * GitHub Pages remains the Olivia-style application URL; the optional
+ * Cloudflare Pages app is its trusted Hono OTA/WebSocket gateway.
+ * No OAuth credentials, XiaoZhi cookies or device secrets belong here.
  */
 (() => {
- 'use strict';
- const github = location.hostname.toLowerCase() === 'xulytiengviet.github.io';
- let deployed = '';
- try {
-  const input=String(window.BILABOT_DEPLOY_URL||'').trim();
-  if(input){const u=new URL(input);if(u.protocol==='https:'&&u.hostname!==location.hostname&&!u.username&&!u.password)deployed=u.origin;}
- }catch{}
- if(github&&deployed)location.replace(deployed+'/'+location.search+location.hash);
- window.BILABOT_CONFIG=Object.freeze({
-  workerUrl:github?deployed:location.origin,sameOrigin:!github,
-  mode:'gateway',autoPair:false
- });
+  'use strict';
+  const onGitHub = location.hostname.toLowerCase() === 'xulytiengviet.github.io';
+  let deployed = '';
+  try {
+    const value = String(window.BILABOT_DEPLOY_URL || '').trim();
+    if (value) {
+      const url = new URL(value);
+      if (url.protocol === 'https:' && !url.username && !url.password &&
+          url.hostname !== location.hostname && !url.search && !url.hash) {
+        deployed = url.origin;
+      }
+    }
+  } catch {}
+  // Do NOT redirect: the user configures BilaBot at its familiar GitHub URL.
+  // Hono is same-origin when deployed on Cloudflare Pages directly.
+  window.BILABOT_CONFIG = Object.freeze({
+    workerUrl: onGitHub ? deployed : location.origin,
+    sameOrigin: !onGitHub,
+    mode: 'gateway',
+    autoPair: false
+  });
 })();
