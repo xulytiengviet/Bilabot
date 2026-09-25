@@ -1,0 +1,1135 @@
+/**
+ * ============================================================
+ * Xiaozhi ESP32 Web Client - Hono Backend
+ * ============================================================
+ * This serves the complete HTML/CSS/JS web application that
+ * emulates an ESP32 device connecting to a Xiaozhi server.
+ *
+ * Architecture:
+ *  - Hono serves static files and the main HTML shell
+ *  - All ESP32 protocol logic runs in the browser (JS)
+ *  - WebSocket auth headers are injected by /api/ws proxy (browser cannot set them)
+ *  - Audio via WebAudio API + PCM-to-Opus (libopus WASM) if available
+ * ============================================================
+ */
+
+import { Hono } from 'hono'
+import { serveStatic } from 'hono/cloudflare-workers'
+
+const app = new Hono()
+
+// Enable CORS for any API routes
+// Same-origin API only. Deploy both the frontend and Worker on the same domain.
+
+/** Allowed OTA hostnames (mirrors official Xiaozhi ESP32 firmware endpoints) */
+const ALLOWED_OTA_HOSTS = new Set([
+  'api.tenclass.net',
+  'xiaozhi.me',
+  'www.xiaozhi.me',
+  'api.xiaozhi.me',
+])
+
+/** Allowed vision hosts — same as OTA but for the vision/explain endpoint */
+const ALLOWED_VISION_HOSTS = new Set([
+  'api.xiaozhi.me',
+  'xiaozhi.me',
+  'www.xiaozhi.me',
+])
+
+/**
+ * Accept both http:// and https:// vision URLs.
+ * The Xiaozhi server sends the vision URL as http:// in the MCP initialize
+ * capabilities block (e.g. http://api.xiaozhi.me/vision/explain).
+ * We normalise to https:// when forwarding so the upstream request is always TLS.
+ */
+function isAllowedVisionUrl(rawUrl: string): boolean {
+  try {
+    const parsed = new URL(rawUrl)
+    // Accept http:// or https:// — we upgrade to https when forwarding
+    if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') return false
+    return ALLOWED_VISION_HOSTS.has(parsed.hostname)
+  } catch {
+    return false
+  }
+}
+
+/**
+ * Normalise a vision URL to always use https://.
+ * The server sends http:// but the actual endpoint is HTTPS.
+ */
+function normaliseVisionUrl(rawUrl: string): string {
+  return rawUrl.replace(/^http:\/\//i, 'https://')
+}
+
+function isAllowedOtaUrl(rawUrl: string): boolean {
+  try {
+    const parsed = new URL(rawUrl)
+    if (parsed.protocol !== 'https:') return false
+    return ALLOWED_OTA_HOSTS.has(parsed.hostname)
+  } catch {
+    return false
+  }
+}
+
+function buildOtaHeaders(deviceId: string, clientId: string): Record<string, string> {
+  return {
+    'Activation-Version': '1',
+    'Device-Id': deviceId,
+    'Client-Id': clientId,
+    'User-Agent': 'xiaozhi-web-client/1.0.0',
+    'Accept-Language': 'vi-VN',
+    'Content-Type': 'application/json',
+  }
+}
+
+function isAllowedWsUrl(rawUrl: string): boolean {
+  try {
+    const parsed = new URL(rawUrl)
+    if (parsed.protocol !== 'wss:') return false
+    return ALLOWED_OTA_HOSTS.has(parsed.hostname)
+  } catch {
+    return false
+  }
+}
+
+/** Match ESP32 WebsocketProtocol::OpenAudioChannel() Bearer prefix logic */
+function formatBearerToken(token: string): string {
+  return token.includes(' ') ? token : `Bearer ${token}`
+}
+
+/**
+ * WebSocket proxy — injects auth headers the browser cannot set.
+ * Mirrors xiaozhi-web-client/proxy.py extra_headers on upstream connect.
+ *
+ * CRITICAL CLOUDFLARE WORKERS NOTES:
+ * 1. fetch() for WS upgrade MUST use https:// URL, NOT wss://
+ *    The Workers runtime handles the protocol upgrade internally.
+ *    Passing wss:// to fetch() results in webSocket being null.
+ *
+ * 2. Binary frames arrive as Blob (not ArrayBuffer) on compat dates >= 2026-03-17.
+ *    We must set upstream.binaryType = 'arraybuffer' BEFORE accept() to ensure
+ *    binary audio frames (Opus) are forwarded correctly to the browser.
+ *
+ * 3. allowHalfOpen: true is required on accept() for both sockets when proxying,
+ *    so we can coordinate close frames between both sides independently.
+ */
+app.get('/api/ws', async (c) => {
+  if (c.req.header('Upgrade')?.toLowerCase() !== 'websocket') {
+    return c.text('Expected Upgrade: websocket', 426)
+  }
+
+  const targetUrl = c.req.query('url')?.trim() ?? ''
+  const deviceId = c.req.query('device_id')?.trim() ?? ''
+  const clientId = c.req.query('client_id')?.trim() ?? ''
+  const token = c.req.query('token')?.trim() ?? ''
+  const protocolVersion = c.req.query('protocol_version')?.trim() || '1'
+
+  if (!targetUrl || !deviceId || !clientId || !token) {
+    return c.text('url, device_id, client_id, and token are required', 400)
+  }
+  if (!isAllowedWsUrl(targetUrl)) {
+    return c.text('WebSocket URL host is not allowed', 400)
+  }
+
+  // Convert wss:// → https:// for Cloudflare Workers fetch-based WebSocket client.
+  // The Workers runtime REQUIRES https:// when using fetch() to initiate a WS upgrade.
+  // Passing wss:// causes the webSocket property on the response to be null/undefined.
+  const fetchUrl = targetUrl.replace(/^wss:\/\//i, 'https://').replace(/^ws:\/\//i, 'http://')
+
+  const pair = new WebSocketPair()
+  const browserSocket = pair[0]
+  const localSocket = pair[1]
+  // allowHalfOpen: true — needed for proxying so we coordinate close on both ends
+  localSocket.accept({ allowHalfOpen: true })
+
+  const pending: (string | ArrayBuffer | Blob)[] = []
+  let upstream: WebSocket | null = null
+  let upstreamClosed = false
+  let localClosed = false
+
+  const flushPending = async () => {
+    if (!upstream || upstream.readyState !== WebSocket.OPEN) return
+    for (const message of pending) {
+      if (message instanceof Blob) {
+        // Convert Blob → ArrayBuffer before forwarding to preserve binary integrity
+        upstream.send(await message.arrayBuffer())
+      } else {
+        upstream.send(message)
+      }
+    }
+    pending.length = 0
+  }
+
+  const closeLocal = (code = 1011, reason = 'Upstream connection closed') => {
+    if (localClosed) return
+    localClosed = true
+    try {
+      localSocket.close(code, reason)
+    } catch {
+      /* already closed */
+    }
+  }
+
+  const closeUpstream = (code = 1000, reason = 'Client disconnected') => {
+    if (upstreamClosed || !upstream) return
+    upstreamClosed = true
+    try {
+      upstream.close(code, reason)
+    } catch {
+      /* already closed */
+    }
+  }
+
+  localSocket.addEventListener('message', async (event) => {
+    if (upstream && upstream.readyState === WebSocket.OPEN) {
+      if (event.data instanceof Blob) {
+        // Convert Blob → ArrayBuffer so audio frames are passed correctly
+        upstream.send(await event.data.arrayBuffer())
+      } else {
+        upstream.send(event.data)
+      }
+    } else {
+      pending.push(event.data)
+    }
+  })
+
+  localSocket.addEventListener('close', (event) => {
+    closeUpstream(event.code || 1000, event.reason || 'Client disconnected')
+  })
+
+  ;(async () => {
+    try {
+      // IMPORTANT: Use https:// (not wss://) for Cloudflare Workers fetch WebSocket upgrade
+      const upstreamResponse = await fetch(fetchUrl, {
+        headers: {
+          Upgrade: 'websocket',
+          Connection: 'Upgrade',
+          Authorization: formatBearerToken(token),
+          'Protocol-Version': protocolVersion,
+          'Device-Id': deviceId,
+          'Client-Id': clientId,
+        },
+      })
+
+      const upstreamSocket = upstreamResponse.webSocket
+      if (!upstreamSocket) {
+        // Log the response status to aid debugging
+        const statusHint = `HTTP ${upstreamResponse.status} — webSocket property is null`
+        closeLocal(1011, `Upstream WebSocket upgrade failed (${statusHint})`)
+        return
+      }
+
+      upstream = upstreamSocket
+
+      // CRITICAL: Set binaryType to 'arraybuffer' BEFORE accept().
+      // On compat dates >= 2026-03-17 the default is 'blob'.
+      // We need ArrayBuffer so binary Opus audio frames can be forwarded as-is.
+      upstream.binaryType = 'arraybuffer'
+
+      // allowHalfOpen: true — coordinate close frames independently on both sides
+      upstream.accept({ allowHalfOpen: true })
+
+      await flushPending()
+
+      upstream.addEventListener('message', async (event) => {
+        if (localSocket.readyState === WebSocket.OPEN) {
+          if (event.data instanceof Blob) {
+            localSocket.send(await event.data.arrayBuffer())
+          } else {
+            localSocket.send(event.data)
+          }
+        }
+      })
+
+      upstream.addEventListener('close', (event) => {
+        closeLocal(event.code || 1000, event.reason || 'Upstream closed')
+      })
+
+      upstream.addEventListener('error', (event) => {
+        closeLocal(1011, 'Upstream WebSocket error')
+      })
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err)
+      closeLocal(1011, `Failed to connect upstream: ${msg}`)
+    }
+  })()
+
+  return new Response(null, { status: 101, webSocket: browserSocket })
+})
+
+/** Proxy OTA version check — same POST the ESP32 sends on boot */
+app.post('/api/ota/check', async (c) => {
+  const body = await c.req.json<{
+    otaUrl?: string
+    deviceId?: string
+    clientId?: string
+    payload?: Record<string, unknown>
+  }>()
+
+  const otaUrl = body.otaUrl?.trim()
+  const deviceId = body.deviceId?.trim()
+  const clientId = body.clientId?.trim()
+
+  if (!otaUrl || !deviceId || !clientId) {
+    return c.json({ error: 'otaUrl, deviceId, and clientId are required' }, 400)
+  }
+  if (!isAllowedOtaUrl(otaUrl)) {
+    return c.json({ error: 'OTA URL host is not allowed' }, 400)
+  }
+
+  const upstream = await fetch(otaUrl, {
+    method: 'POST',
+    headers: buildOtaHeaders(deviceId, clientId),
+    body: JSON.stringify(body.payload ?? {}),
+  })
+
+  const text = await upstream.text()
+  let data: unknown = {}
+  try {
+    data = text ? JSON.parse(text) : {}
+  } catch {
+    data = { raw: text }
+  }
+
+  return c.json(data, upstream.status as 200)
+})
+
+/** Proxy OTA activate polling — POST {otaUrl}/activate like ESP32 firmware */
+app.post('/api/ota/activate', async (c) => {
+  const body = await c.req.json<{
+    otaUrl?: string
+    deviceId?: string
+    clientId?: string
+    payload?: Record<string, unknown>
+  }>()
+
+  const otaUrl = body.otaUrl?.trim()
+  const deviceId = body.deviceId?.trim()
+  const clientId = body.clientId?.trim()
+
+  if (!otaUrl || !deviceId || !clientId) {
+    return c.json({ error: 'otaUrl, deviceId, and clientId are required' }, 400)
+  }
+  if (!isAllowedOtaUrl(otaUrl)) {
+    return c.json({ error: 'OTA URL host is not allowed' }, 400)
+  }
+
+  const activateUrl = otaUrl.endsWith('/') ? `${otaUrl}activate` : `${otaUrl}/activate`
+
+  const upstream = await fetch(activateUrl, {
+    method: 'POST',
+    headers: buildOtaHeaders(deviceId, clientId),
+    body: JSON.stringify(body.payload ?? {}),
+  })
+
+  const text = await upstream.text()
+  let data: unknown = {}
+  try {
+    data = text ? JSON.parse(text) : {}
+  } catch {
+    data = { raw: text }
+  }
+
+  return c.json(data, upstream.status as 200)
+})
+
+/**
+ * Vision proxy — POST multipart/form-data image to Xiaozhi vision endpoint.
+ *
+ * Protocol (exactly mirrors Esp32Camera::Explain() from xiaozhi-esp32 firmware):
+ *
+ *   POST <vision_url>
+ *   Headers:
+ *     Authorization: Bearer <vision_token>
+ *     Device-Id: <mac_address>
+ *     Client-Id: <uuid>
+ *     Content-Type: multipart/form-data; boundary=<boundary>
+ *   Body (multipart/form-data):
+ *     --<boundary>
+ *     Content-Disposition: form-data; name="question"
+ *
+ *     <text question>
+ *     --<boundary>
+ *     Content-Disposition: form-data; name="file"; filename="camera.jpg"
+ *     Content-Type: image/jpeg
+ *
+ *     <jpeg binary data>
+ *     --<boundary>--
+ *
+ * IMPORTANT: The MCP server sends the vision URL as http:// (not https://).
+ * We normalise to https:// before forwarding.
+ *
+ * CORS: The browser cannot POST directly to api.xiaozhi.me because CORS
+ * headers are not set for browser origins. We proxy through here and add
+ * the required auth headers.
+ */
+app.post('/api/vision/explain', async (c) => {
+  const rawVisionUrl = c.req.header('X-Vision-Url')?.trim()   ?? ''
+  const token        = c.req.header('X-Vision-Token')?.trim() ?? ''
+  const deviceId     = c.req.header('X-Device-Id')?.trim()    ?? ''
+  const clientId     = c.req.header('X-Client-Id')?.trim()    ?? ''
+
+  if (!rawVisionUrl) {
+    return c.json({ error: 'X-Vision-Url header is required' }, 400)
+  }
+
+  // Validate the host (accept both http:// and https://)
+  if (!isAllowedVisionUrl(rawVisionUrl)) {
+    return c.json({ error: `Vision URL host is not allowed (got: ${rawVisionUrl})` }, 400)
+  }
+
+  // Normalise to https:// — the server sends http:// in MCP capabilities
+  // but the actual API endpoint requires TLS.
+  const visionUrl = normaliseVisionUrl(rawVisionUrl)
+
+  // Forward the entire multipart body unchanged.
+  // The Content-Type (including boundary) is preserved from the original request.
+  const contentType = c.req.header('Content-Type') ?? ''
+  const body = await c.req.arrayBuffer()
+
+  const headers: Record<string, string> = {
+    'Content-Type': contentType,
+    'User-Agent': 'xiaozhi-esp32/1.0.0',
+  }
+  if (token)    headers['Authorization'] = token.startsWith('Bearer ') ? token : `Bearer ${token}`
+  if (deviceId) headers['Device-Id']     = deviceId
+  if (clientId) headers['Client-Id']     = clientId
+
+  let upstream: Response
+  try {
+    upstream = await fetch(visionUrl, {
+      method:  'POST',
+      headers,
+      body,
+    })
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err)
+    return c.json({ error: `Vision fetch failed: ${msg}` }, 502)
+  }
+
+  const text = await upstream.text()
+
+  // Return the raw response with the same status
+  return c.text(text, upstream.status as 200, {
+    'Content-Type': upstream.headers.get('Content-Type') ?? 'application/json',
+    'Access-Control-Allow-Origin': '*',
+  })
+})
+
+// Serve static assets (JS, CSS, audio worklets, etc.)
+app.use('/static/*', serveStatic({ root: './public' }))
+
+// Serve favicon inline
+
+
+// ── Main application HTML ────────────────────────────────────────────────────
+app.get('/', (c) => {
+  return c.html(`<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, interactive-widget=resizes-content" />
+  <title>BilaBot — Trợ lý giọng nói XiaoZhi AI</title>
+  <meta name="description" content="BilaBot: trợ lý AI tiếng Việt chạy trên trình duyệt; ghép nối xiaozhi.me, WebSocket, Opus, STT, TTS và MCP." />
+
+  <!-- BilaBot Brand Identity: favicon, PWA manifest, touch icons -->
+  <link rel="icon" type="image/svg+xml" href="/static/logo/favicon.svg" />
+  <link rel="manifest" href="/static/manifest.json" />
+  <meta name="theme-color" content="#0084ff" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+  <meta name="apple-mobile-web-app-title" content="BilaBot" />
+
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+
+  <!-- Icons -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.5.1/css/all.min.css" />
+
+  <!-- Our CSS -->
+  <link rel="stylesheet" href="/static/style.css" />
+</head>
+<body>
+
+<!-- ╔══════════════════════════════════════════════════════════╗
+     ║              APP ROOT CONTAINER                         ║
+     ╚══════════════════════════════════════════════════════════╝ -->
+<div id="app" class="app-container">
+
+  <!-- ── LEFT SIDEBAR ─────────────────────────────────────── -->
+  <aside class="sidebar" id="sidebar">
+
+    <!-- Profile / Device Section -->
+    <div class="sidebar-header">
+      <div class="device-avatar" id="deviceAvatar">
+        <span class="olivia-monogram" role="img" aria-label="BilaBot"></span>
+      </div>
+      <div class="device-info">
+        <span class="olivia-wordmark device-name" id="deviceNameDisplay" role="img" aria-label="BilaBot"></span>
+        <div class="device-status" id="deviceStatusBadge">
+          <span class="status-dot offline" id="statusDot"></span>
+          <span id="statusText">Offline</span>
+        </div>
+      </div>
+      <button class="theme-toggle-btn" id="themeToggleBtn" title="Toggle light/dark theme">
+        <i class="fas fa-sun icon-sun"></i>
+        <i class="fas fa-moon icon-moon"></i>
+      </button>
+      <button class="global-settings-btn" id="globalSettingsBtn" title="Settings">
+        <i class="fas fa-gear"></i>
+      </button>
+    </div>
+
+    <section class="bilabot-login-box" aria-label="Kết nối tài khoản XiaoZhi">
+      <div class="bilabot-login-label">BẮT ĐẦU VỚI XIAOZHI</div>
+      <a class="bilabot-login-link" target="_blank" rel="noopener noreferrer"
+         href="https://xiaozhi.me/console/login?redirect=%2Fconsole%2F">
+        <i class="fas fa-arrow-up-right-from-square"></i> Đăng nhập XiaoZhi
+      </a>
+      <p>Đăng nhập tại trang chính thức, quay lại BilaBot và nhấn nút Kết nối (biểu tượng phích cắm). Lần đầu cần nhập mã kích hoạt thiết bị ảo.</p>
+    </section>
+
+    <!-- Navigation Tabs -->
+    <div class="sidebar-tabs">
+      <button class="tab-btn active" data-tab="chat">
+        <i class="fas fa-comment-dots"></i>
+        <span>Trò chuyện</span>
+      </button>
+      <button class="tab-btn" data-tab="debug">
+        <i class="fas fa-terminal"></i>
+        <span>Nhật ký</span>
+      </button>
+      <button class="tab-btn" data-tab="info">
+        <i class="fas fa-info-circle"></i>
+        <span>Thông tin</span>
+      </button>
+    </div>
+
+    <!-- Connection Status Card -->
+    <div class="connection-card" id="connectionCard">
+      <div class="connection-state" id="connectionState">
+        <i class="fas fa-circle-notch fa-spin" id="connectionIcon" style="display:none;"></i>
+        <i class="fas fa-plug-circle-xmark" id="connectionIconOff"></i>
+        <span id="connectionLabel">Chưa kết nối</span>
+      </div>
+      <div class="session-info" id="sessionInfo" style="display:none;">
+        <small>Session: <code id="sessionIdDisplay">—</code></small>
+      </div>
+    </div>
+
+    <!-- AI Assistants List (PHASE 1: Multi-Assistant Foundation) -->
+    <div class="conversation-list" id="assistantList">
+      <div class="conv-list-header">Trợ lý AI</div>
+      <!-- Assistant items are rendered dynamically by
+           UIController.renderAssistantList() from AssistantManager's
+           stored assistants. See public/static/app.js. -->
+      <div id="assistantListItems"></div>
+      <button class="add-assistant-btn" id="addAssistantBtn" title="Add a new assistant">
+        <i class="fas fa-plus"></i>
+        <span>Thêm trợ lý</span>
+      </button>
+    </div>
+
+    <!-- Audio Level Meter -->
+    <div class="audio-meter-section" id="audioMeterSection" style="display:none;">
+      <div class="audio-meter-label"><i class="fas fa-microphone"></i> Input Level</div>
+      <div class="audio-meter-bar">
+        <div class="audio-meter-fill" id="audioMeterFill"></div>
+      </div>
+    </div>
+
+  </aside>
+
+  <!-- ── GLOBAL SETTINGS PANEL (slides in from right) ──────── -->
+  <!-- v2.2: Global app-level settings for Backup & Restore and future
+       user preferences. Opened via the gear icon in the sidebar header.
+       This is SEPARATE from the per-assistant settings panel (settingsPanel)
+       which is scoped to a single assistant's configuration. -->
+  <div class="global-settings-panel" id="globalSettingsPanel">
+    <div class="settings-header">
+      <h2><i class="fas fa-gear"></i> Settings</h2>
+      <button class="close-settings-btn" id="closeGlobalSettingsBtn"><i class="fas fa-times"></i></button>
+    </div>
+    <div class="settings-body">
+
+      <div class="settings-section">
+        <h3>Sao lưu và khôi phục</h3>
+
+        <div class="form-group">
+          <button class="btn-primary btn-block" type="button" id="exportDataBtn">
+            <i class="fas fa-file-export"></i> Export BilaBot Data
+          </button>
+          <small>Downloads a complete backup of all your BilaBot data as a JSON file.</small>
+        </div>
+
+        <div class="form-group">
+          <label>Lần sao lưu cuối</label>
+          <div class="backup-timestamp" id="lastBackupTimestamp">Chưa có</div>
+        </div>
+
+        <div class="form-group">
+          <button class="btn-secondary btn-block" type="button" id="importDataBtn">
+            <i class="fas fa-file-import"></i> Import BilaBot Data
+          </button>
+          <small>Restore from a previously exported BilaBot backup file (.json).</small>
+          <input type="file" id="importFileInput" accept=".json,application/json" style="display:none;" />
+        </div>
+      </div>
+
+      <!-- Future settings sections go here:
+           Language, Accessibility, Reset Application, Experimental Features -->
+
+    </div>
+  </div>
+
+  <!-- ── IMPORT CONFIRMATION MODAL ──────────────────────── -->
+  <div class="import-confirm-overlay" id="importConfirmOverlay" style="display:none;">
+    <div class="import-confirm-card">
+      <div class="import-confirm-header">
+        <i class="fas fa-file-import"></i>
+        <h3>Import Backup</h3>
+      </div>
+      <p class="import-confirm-message">Importing this backup will replace your current BilaBot data. This cannot be undone.</p>
+      <div class="import-confirm-meta" id="importConfirmMeta"></div>
+      <div class="import-confirm-actions">
+        <button class="btn-secondary" type="button" id="importCancelBtn">Cancel</button>
+        <button class="btn-primary" type="button" id="importConfirmBtn">
+          <i class="fas fa-check"></i> Import
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── SETTINGS PANEL (slides in) ──────────────────────── -->
+  <!-- PHASE 2: this panel is now shared across ALL assistants — it is
+       opened either via the sidebar profile gear (active assistant) or
+       via a per-assistant gear icon in the AI Assistants list (any
+       assistant, active or not). UIController tracks which assistant id
+       the panel currently targets and reads/writes THAT assistant's
+       fields, never assuming "the active one". See app.js openSettingsFor(). -->
+  <div class="settings-panel" id="settingsPanel">
+    <div class="settings-header">
+      <h2><i class="fas fa-cog"></i> Assistant Settings</h2>
+      <button class="close-settings-btn" id="closeSettingsBtn"><i class="fas fa-times"></i></button>
+    </div>
+    <div class="settings-body">
+
+      <div class="settings-section">
+        <h3>Trợ lý</h3>
+        <div class="form-group">
+          <label for="assistantNameInput">Tên trợ lý</label>
+          <input type="text" id="assistantNameInput" placeholder="My Assistant" />
+          <small>Shown in the AI Assistants sidebar list and chat header</small>
+        </div>
+        <!-- PHASE 4: Avatar management inside settings -->
+        <div class="form-group">
+          <label>Ảnh đại diện</label>
+          <div class="settings-avatar-section">
+            <div class="settings-avatar-preview" id="settingsAvatarPreview">
+              <img class="assistant-avatar-img" id="settingsAvatarImg" src="/static/olivia-avatar-default.svg" alt="Assistant Avatar" />
+            </div>
+            <div class="settings-avatar-actions">
+              <button class="btn-secondary" type="button" id="settingsUploadAvatarBtn">
+                <i class="fas fa-upload"></i> Upload New Image
+              </button>
+              <button class="btn-secondary btn-small-danger" type="button" id="settingsRemoveAvatarBtn">
+                <i class="fas fa-trash"></i> Remove
+              </button>
+            </div>
+          </div>
+          <small>PNG, JPG, JPEG, WEBP &mdash; auto-resized to 256&times;256</small>
+        </div>
+        <div class="form-group">
+          <label>Connection Status</label>
+          <div class="pairing-status-display" id="assistantConnectionStatusDisplay">Disconnected</div>
+        </div>
+        <div class="form-group settings-connection-actions">
+          <button class="btn-secondary" type="button" id="settingsReconnectBtn">
+            <i class="fas fa-plug"></i> Connect / Reconnect
+          </button>
+          <button class="btn-secondary" type="button" id="settingsDisconnectBtn">
+            <i class="fas fa-plug-circle-xmark"></i> Disconnect
+          </button>
+        </div>
+        <div class="form-group">
+          <button class="btn-danger btn-block" type="button" id="deleteAssistantBtn">
+            <i class="fas fa-trash"></i> Delete Assistant
+          </button>
+          <small>Cannot delete the last remaining assistant</small>
+        </div>
+      </div>
+
+      <div class="settings-section">
+        <h3>Connection</h3>
+        <div class="form-group">
+          <label for="wsUrlInput">WebSocket URL</label>
+          <input type="text" id="wsUrlInput" placeholder="wss://api.xiaozhi.me/xiaozhi/v1/"
+                 value="wss://api.xiaozhi.me/xiaozhi/v1/" />
+          <small>Official server: wss://api.xiaozhi.me/xiaozhi/v1/</small>
+        </div>
+        <div class="form-group">
+          <label for="otaUrlInput">OTA / Provisioning URL</label>
+          <input type="text" id="otaUrlInput" placeholder="https://api.tenclass.net/xiaozhi/ota/"
+                 value="https://api.tenclass.net/xiaozhi/ota/" />
+          <small>Device registration endpoint (same as ESP32 firmware)</small>
+        </div>
+        <div class="form-group">
+          <label>Pairing Status</label>
+          <div class="pairing-status-display" id="pairingStatusDisplay">Not paired</div>
+          <small>Devices pair automatically via 6-digit code at xiaozhi.me</small>
+        </div>
+        <div class="form-group">
+          <button class="btn-secondary btn-block" type="button" id="resetPairingBtn">
+            <i class="fas fa-unlink"></i> Reset Pairing
+          </button>
+        </div>
+      </div>
+
+      <div class="settings-section">
+        <h3>Virtual Device Identity</h3>
+        <!-- PHASE 4: Device Name field removed from UI per spec.
+             The device name is always "BilaBot" from the user's perspective.
+             The internal field still exists in AssistantManager for protocol use. -->
+        <input type="hidden" id="deviceNameInput" value="BilaBot" />
+        <div class="form-group">
+          <label for="deviceIdInput">Device-Id (MAC Address)</label>
+          <input type="text" id="deviceIdInput" placeholder="Auto-generated" />
+          <small>Leave blank to auto-generate persistent MAC-style ID</small>
+        </div>
+        <div class="form-group">
+          <label for="clientIdInput">Client-Id (UUID)</label>
+          <input type="text" id="clientIdInput" placeholder="Auto-generated UUID" />
+          <small>Leave blank to auto-generate persistent UUID</small>
+        </div>
+      </div>
+
+      <div class="settings-section">
+        <h3>Protocol Settings</h3>
+        <div class="form-group">
+          <label for="protocolVersionInput">Protocol Version</label>
+          <select id="protocolVersionInput">
+            <option value="1" selected>Version 1 (Raw Opus)</option>
+            <option value="2">Version 2 (Timestamped)</option>
+            <option value="3">Version 3 (Lightweight Header)</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label for="frameDurationInput">Frame Duration (ms)</label>
+          <select id="frameDurationInput">
+            <option value="20">20ms (Low Latency)</option>
+            <option value="40">40ms</option>
+            <option value="60" selected>60ms (Standard)</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label for="listeningModeInput">Listening Mode</label>
+          <select id="listeningModeInput">
+            <option value="auto" selected>Auto (VAD stop)</option>
+            <option value="manual">Manual</option>
+            <option value="realtime">Realtime</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="settings-section">
+        <h3>Audio</h3>
+        <div class="form-group checkbox-group">
+          <label>
+            <input type="checkbox" id="audioEnabled" checked />
+            <span>Enable Microphone (voice mode)</span>
+          </label>
+        </div>
+        <div class="form-group checkbox-group">
+          <label>
+            <input type="checkbox" id="ttsPlayback" checked />
+            <span>Play TTS audio from server</span>
+          </label>
+        </div>
+      </div>
+
+      <div class="settings-actions">
+        <button class="btn-primary" id="saveSettingsBtn">
+          <i class="fas fa-save"></i> Save Settings
+        </button>
+        <button class="btn-secondary" id="resetSettingsBtn">
+          <i class="fas fa-rotate-left"></i> Reset to Defaults
+        </button>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ── MAIN CHAT AREA ────────────────────────────────────── -->
+  <main class="chat-area">
+
+    <!-- Top Bar -->
+    <header class="chat-header">
+      <button class="sidebar-toggle-mobile" id="sidebarToggleMobile">
+        <i class="fas fa-bars"></i>
+      </button>
+      <div class="chat-header-info">
+        <!-- PHASE 4: chat-avatar is clickable and shows the active assistant's avatar.
+             Clicking it opens the avatar upload dialog. -->
+        <div class="chat-avatar assistant-avatar-clickable" id="chatHeaderAvatar" title="Change assistant avatar">
+          <img class="assistant-avatar-img" id="chatHeaderAvatarImg" src="/static/olivia-avatar-default.svg" alt="Assistant Avatar" />
+        </div>
+        <div class="chat-title-block">
+          <!-- PHASE 1: shows the active assistant's name instead of the
+               hardcoded "BILABOT" app title. Updated by
+               UIController.renderActiveAssistantHeader(). -->
+          <h2 id="activeAssistantName">BILABOT</h2>
+          <div class="chat-subtitle" id="chatSubtitle">Powered by BilaBot &mdash; Disconnected</div>
+        </div>
+      </div>
+      <div class="chat-header-actions">
+        <!-- BILABOT FEATURE: Per-assistant local speech volume.
+             Speaker button opens a floating slider popup (see VolumeSystem
+             in app.js). Volume is saved per-assistant and ONLY controls
+             BilaBot's local TTS playback gain — it never touches Xiaozhi. -->
+        <div class="speaker-btn-wrapper" id="speakerBtnWrapper">
+          <button class="action-btn" id="speakerBtn" title="Assistant speech volume">
+            <i class="fas fa-volume-high" id="speakerBtnIcon"></i>
+          </button>
+          <div class="volume-popup" id="volumePopup" style="display:none;">
+            <div class="volume-popup-row">
+              <i class="fas fa-volume-low volume-popup-icon-min"></i>
+              <input type="range" id="volumeSlider" class="volume-slider" min="0" max="100" step="1" value="100" aria-label="Assistant speech volume" />
+              <i class="fas fa-volume-high volume-popup-icon-max"></i>
+            </div>
+            <div class="volume-popup-label" id="volumeSliderLabel">100%</div>
+          </div>
+        </div>
+        <div class="device-state-chip" id="deviceStateChip">
+          <i class="fas fa-circle" id="stateChipIcon"></i>
+          <span id="stateChipText">IDLE</span>
+        </div>
+        <button class="action-btn" id="connectBtn" title="Kết nối XiaoZhi">
+          <i class="fas fa-plug"></i>
+        </button>
+        <button class="action-btn" id="disconnectBtn" title="Ngắt kết nối" style="display:none;">
+          <i class="fas fa-plug-circle-xmark"></i>
+        </button>
+        <button class="action-btn danger" id="clearChatBtn" title="Xóa trò chuyện">
+          <i class="fas fa-trash-alt"></i>
+        </button>
+      </div>
+    </header>
+
+    <!-- Messages Container -->
+    <div class="messages-container" id="messagesContainer">
+
+      <!-- System welcome message -->
+      <div class="system-message" id="welcomeMsg">
+        <span class="olivia-monogram olivia-monogram-inline" role="img" aria-label="BilaBot"></span>
+        <span>BilaBot sẵn sàng. Đăng nhập XiaoZhi, sau đó nhấn Kết nối để ghép nối thiết bị ảo.</span>
+      </div>
+
+    </div>
+
+    <!-- Typing Indicator (shown when AI is generating) -->
+    <div class="typing-indicator" id="typingIndicator" style="display:none;">
+      <!-- PHASE 4: typing avatar uses the active assistant's avatar -->\n      <div class="typing-avatar" id="typingAvatar"><img class="assistant-avatar-img" id="typingAvatarImg" src="/static/olivia-avatar-default.svg" alt="AI" style="width:32px;height:32px;border-radius:50%;object-fit:cover;" /></div>
+      <div class="typing-bubble">
+        <div class="typing-dots">
+          <span></span><span></span><span></span>
+        </div>
+        <div class="typing-status" id="typingStatus">AI đang suy nghĩ...</div>
+      </div>
+    </div>
+
+    <!-- Input Area -->
+    <div class="input-area">
+      <!-- ── Image Attachment Preview (shown when image is selected) ── -->
+      <div class="image-attachment-bar" id="imageAttachmentBar" style="display:none;">
+        <div class="image-attachment-preview">
+          <img class="attachment-thumb" id="attachmentThumb" src="" alt="attachment" />
+          <div class="attachment-info">
+            <span class="attachment-name" id="attachmentName">Photo</span>
+          </div>
+          <button class="attachment-remove-btn" id="attachmentRemoveBtn" title="Remove image">
+            <i class="fas fa-times"></i>
+          </button>
+        </div>
+      </div>
+
+      <div class="input-toolbar">
+        <!-- Plus / Attach button -->
+        <div class="plus-btn-wrapper" id="plusBtnWrapper">
+          <button class="toolbar-btn plus-btn" id="plusBtn" title="Attach image">
+            <i class="fas fa-plus"></i>
+          </button>
+          <!-- Plus popup menu -->
+          <div class="plus-popup" id="plusPopup" style="display:none;">
+            <button class="plus-menu-item" id="menuCameraBtn">
+              <i class="fas fa-camera"></i>
+              <span>Camera</span>
+            </button>
+            <button class="plus-menu-item plus-menu-disabled" id="menuPhotosBtn" disabled>
+              <i class="fas fa-image"></i>
+              <span>Photos</span>
+              <span class="coming-soon-badge">Soon</span>
+            </button>
+            <div class="plus-menu-divider"></div>
+            <button class="plus-menu-item plus-menu-disabled" disabled>
+              <i class="fas fa-paperclip"></i>
+              <span>Documents</span>
+              <span class="coming-soon-badge">Soon</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Voice button -->
+        <button class="toolbar-btn mic-btn" id="micBtn" title="Hold to speak / Click to toggle">
+          <i class="fas fa-microphone" id="micIcon"></i>
+        </button>
+        <!-- Text input -->
+        <div class="input-wrapper">
+          <textarea
+            id="messageInput"
+            placeholder="Type a message... (Enter to send)"
+            rows="1"
+          ></textarea>
+        </div>
+        <!-- Send button -->
+        <button class="send-btn" id="sendBtn" title="Send message">
+          <i class="fas fa-paper-plane"></i>
+        </button>
+      </div>
+      <div class="input-status-bar" id="inputStatusBar">
+        <span id="charCount"></span>
+        <span id="inputHint">Connect to server to start chatting</span>
+      </div>
+    </div>
+
+    <!-- ── Camera Modal ──────────────────────────────────────── -->
+    <div class="camera-modal" id="cameraModal" style="display:none;">
+      <div class="camera-modal-overlay" id="cameraModalOverlay"></div>
+      <div class="camera-modal-content">
+        <div class="camera-modal-header">
+          <h3><i class="fas fa-camera"></i> Take Photo</h3>
+          <button class="camera-close-btn" id="cameraCloseBtn">
+            <i class="fas fa-times"></i>
+          </button>
+        </div>
+
+        <!-- Live viewfinder -->
+        <div class="camera-viewfinder" id="cameraViewfinder">
+          <video id="cameraVideo" autoplay playsinline muted></video>
+          <canvas id="cameraCanvas" style="display:none;"></canvas>
+          <div class="camera-controls">
+            <button class="camera-switch-btn" id="cameraSwitchBtn" title="Switch camera">
+              <i class="fas fa-rotate"></i>
+            </button>
+            <button class="camera-capture-btn" id="cameraCaptureBtn">
+              <i class="fas fa-circle"></i>
+            </button>
+          </div>
+        </div>
+
+        <!-- Preview after capture -->
+        <div class="camera-preview" id="cameraPreview" style="display:none;">
+          <img id="cameraPreviewImg" src="" alt="Preview" />
+          <div class="camera-preview-actions">
+            <button class="btn-secondary" id="cameraRetakeBtn">
+              <i class="fas fa-rotate-left"></i> Retake
+            </button>
+            <button class="btn-primary" id="cameraUsephotoBtn">
+              <i class="fas fa-check"></i> Use Photo
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Hidden file input for gallery -->
+    <input type="file" id="galleryFileInput" accept="image/jpeg,image/jpg,image/png,image/webp,image/gif,image/bmp,image/heic,image/*" style="display:none;" />
+    <!-- Hidden file input for avatar upload (PHASE 4) -->
+    <input type="file" id="avatarFileInput" accept="image/png,image/jpeg,image/jpg,image/webp" style="display:none;" />
+
+  </main>
+
+  <!-- ── DEBUG PANEL (overlays chat when tab active) ──────── -->
+  <div class="debug-panel" id="debugPanel" style="display:none;">
+    <div class="debug-header">
+      <h3><i class="fas fa-terminal"></i> Protocol Debug Console</h3>
+      <div class="debug-actions">
+        <button class="btn-small" id="clearDebugBtn"><i class="fas fa-trash"></i> Clear</button>
+        <button class="btn-small" id="copyDebugBtn"><i class="fas fa-copy"></i> Copy</button>
+      </div>
+    </div>
+    <div class="debug-log" id="debugLog"></div>
+  </div>
+
+  <!-- ── INFO PANEL ("About BilaBot") ──────────────────────── -->
+  <!-- PHASE 6: Refactored from a single-device "Device Identity" info
+       panel into a platform-level "About BilaBot" page. BilaBot is now a
+       multi-assistant platform — every assistant owns its own Device-Id /
+       Client-Id / pairing / connection, so no single set of those values
+       can correctly represent the whole app anymore. Those live-per-
+       assistant values still exist, but only inside each assistant's own
+       Settings panel (see settings-panel above) — never duplicated here.
+       This panel is purely descriptive/informational + a few safe,
+       aggregate, non-identifying stats (System Status section below). -->
+  <div class="info-panel" id="infoPanel" style="display:none;">
+    <div class="info-content">
+      <div class="about-brand-header">
+        <span class="olivia-wordmark about-wordmark" role="img" aria-label="BilaBot"></span>
+      </div>
+      <p>BilaBot (Trợ lý giọng nói XiaoZhi AI) is a browser-based multi-assistant AI platform built on the Xiaozhi protocol.</p>
+      <p>Each assistant maintains its own independent identity, pairing, conversation history, connection, avatar, volume, and settings while sharing one unified interface.</p>
+      <p>Internally, BilaBot emulates multiple virtual ESP32 devices, but this implementation detail is abstracted away to provide a seamless multi-assistant experience.</p>
+
+      <h4>Features</h4>
+      <div class="info-feature-grid">
+        <div class="info-feature-item"><i class="fas fa-check"></i> Multi-assistant architecture</div>
+        <div class="info-feature-item"><i class="fas fa-check"></i> Independent assistant sessions</div>
+        <div class="info-feature-item"><i class="fas fa-check"></i> Independent conversations</div>
+        <div class="info-feature-item"><i class="fas fa-check"></i> Independent Xiaozhi pairing</div>
+        <div class="info-feature-item"><i class="fas fa-check"></i> Independent connections</div>
+        <div class="info-feature-item"><i class="fas fa-check"></i> Per-assistant avatars</div>
+        <div class="info-feature-item"><i class="fas fa-check"></i> Per-assistant volume controls</div>
+        <div class="info-feature-item"><i class="fas fa-check"></i> Light &amp; Dark theme support</div>
+        <div class="info-feature-item"><i class="fas fa-check"></i> Persistent local storage</div>
+        <div class="info-feature-item"><i class="fas fa-check"></i> Browser-based platform</div>
+        <div class="info-feature-item"><i class="fas fa-check"></i> Cloudflare Pages deployment</div>
+      </div>
+
+      <h4>Technology Stack</h4>
+      <div class="tech-stack-grid">
+        <div class="tech-stack-col">
+          <div class="tech-stack-col-title">Frontend</div>
+          <ul>
+            <li>TypeScript</li>
+            <li>Vanilla JavaScript</li>
+            <li>HTML5</li>
+            <li>CSS3</li>
+          </ul>
+        </div>
+        <div class="tech-stack-col">
+          <div class="tech-stack-col-title">Backend</div>
+          <ul>
+            <li>Hono</li>
+            <li>Cloudflare Pages</li>
+            <li>Cloudflare Workers</li>
+          </ul>
+        </div>
+        <div class="tech-stack-col">
+          <div class="tech-stack-col-title">Communication</div>
+          <ul>
+            <li>WebSocket</li>
+            <li>Opus Audio</li>
+            <li>Xiaozhi Protocol v1</li>
+          </ul>
+        </div>
+      </div>
+
+      <h4>Protocol Summary</h4>
+      <div class="protocol-table">
+        <div class="proto-row"><span>Transport</span><code>WebSocket (ws / wss)</code></div>
+        <div class="proto-row"><span>Audio Codec</span><code>Opus @ 16 kHz Mono</code></div>
+        <div class="proto-row"><span>Provisioning</span><code>6-digit Pairing Code</code></div>
+        <div class="proto-row"><span>Authentication</span><code>Bearer Token</code></div>
+        <div class="proto-row"><span>Protocol Version</span><code>1</code></div>
+      </div>
+
+      <h4>Assistant Architecture</h4>
+      <p>Each assistant maintains its own independent:</p>
+      <ul class="info-bullet-list">
+        <li>Device ID</li>
+        <li>Client ID</li>
+        <li>Pairing Token</li>
+        <li>WebSocket Session</li>
+        <li>Conversation History</li>
+        <li>Avatar</li>
+        <li>Audio Volume</li>
+        <li>Settings</li>
+      </ul>
+      <p>Internally, every assistant behaves as its own virtual ESP32 device, while presenting one unified application to the user.</p>
+
+      <h4>System Status</h4>
+      <div class="protocol-table" id="systemStatusTable">
+        <div class="proto-row"><span>Application Version</span><code>BilaBot 2.2</code></div>
+        <div class="proto-row"><span>Registered Assistants</span><code id="statAssistantCount">—</code></div>
+        <div class="proto-row"><span>Connected Assistants</span><code id="statConnectedCount">—</code></div>
+        <div class="proto-row"><span>Stored Conversations</span><code id="statConversationCount">—</code></div>
+        <div class="proto-row"><span>Theme</span><code id="statTheme">—</code></div>
+        <div class="proto-row"><span>Storage</span><code>Browser Local Storage</code></div>
+      </div>
+
+      <h4>Open Source</h4>
+      <div class="open-source-links">
+        <a class="open-source-link" href="https://github.com/roalfb/olivia-ai" target="_blank" rel="noopener">
+          <i class="fab fa-github"></i>
+          <span>Project Repository</span>
+        </a>
+        <a class="open-source-link" href="https://github.com/roalfb/olivia-ai/blob/main/README.md" target="_blank" rel="noopener">
+          <i class="fab fa-github"></i>
+          <span>Documentation</span>
+        </a>
+        <a class="open-source-link" href="https://github.com/roalfb/olivia-ai/issues" target="_blank" rel="noopener">
+          <i class="fab fa-github"></i>
+          <span>Issues</span>
+        </a>
+      </div>
+
+      <h4>Version</h4>
+      <div class="protocol-table">
+        <div class="proto-row"><span>Version</span><code>2.2</code></div>
+        <div class="proto-row"><span>Dự án</span><code>Trợ lý giọng nói XiaoZhi AI</code></div>
+        <div class="proto-row"><span>License</span><code>MIT</code></div>
+        <div class="proto-row"><span>Nền tảng gốc</span><code>Olivia AI — Roalf Burgonio (MIT)</code></div>
+      </div>
+    </div>
+  </div>
+
+</div><!-- #app -->
+
+<!-- Pairing / activation overlay -->
+<div class="pairing-overlay" id="pairingOverlay" style="display:none;">
+  <div class="pairing-card">
+    <a class="bilabot-login-link" target="_blank" rel="noopener noreferrer"
+       href="https://xiaozhi.me/console/login?redirect=%2Fconsole%2F">Đăng nhập XiaoZhi để ghép nối ↗</a>
+    <div class="pairing-header">
+      <i class="fas fa-link"></i>
+      <h2 id="pairingTitle">Kích hoạt BilaBot</h2>
+    </div>
+    <p class="pairing-message" id="pairingMessage">
+      Đăng nhập <a href="https://xiaozhi.me/console/login?redirect=%2Fconsole%2F" target="_blank" rel="noopener noreferrer">trang chính thức XiaoZhi</a>, thêm thiết bị và nhập mã kích hoạt bên dưới.
+    </p>
+    <div class="pairing-code" id="pairingCodeDisplay">------</div>
+    <button class="btn-secondary pairing-copy-btn" type="button" id="copyPairingCodeBtn">
+      <i class="fas fa-copy"></i> Copy Code
+    </button>
+    <div class="pairing-status-row">
+      <i class="fas fa-circle-notch fa-spin" id="pairingStatusIcon"></i>
+      <span id="pairingStatusText">Đang chờ ghép nối...</span>
+    </div>
+    <button class="btn-secondary pairing-cancel-btn" type="button" id="cancelPairingBtn">
+      Cancel
+    </button>
+  </div>
+</div>
+
+<!-- Loading overlay -->
+<div class="loading-overlay" id="loadingOverlay">
+  <div class="loading-card">
+    <span class="olivia-monogram loading-monogram" role="img" aria-label="BilaBot"></span>
+    <div class="loading-spinner"></div>
+    <div class="loading-text" id="loadingText">Đang khởi động BilaBot...</div>
+  </div>
+</div>
+
+<!-- Notification toast -->
+<div class="toast-container" id="toastContainer"></div>
+
+<!-- Our JS modules (loaded as module scripts) -->
+<script type="module" src="/static/app.js"></script>
+
+</body>
+</html>`)
+})
+
+export default app
