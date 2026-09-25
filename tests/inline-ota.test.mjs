@@ -5,6 +5,7 @@ import { readFileSync } from 'node:fs';
 const app = readFileSync('docs/static/app.js', 'utf8');
 const auth = readFileSync('docs/auth.js', 'utf8');
 const html = readFileSync('docs/index.html', 'utf8');
+const theme = readFileSync('docs/olivia-theme.css', 'utf8');
 const first = app.indexOf('const ProvisioningManager = (() => {');
 const last = app.indexOf('// MODULE: AudioEngine', first);
 assert.ok(first >= 0 && last > first);
@@ -70,9 +71,9 @@ test('challenge-only OTA responses do not result in fake pairing',async()=>{
 });
 
 test('inline setup displays and copies server code; chat opens only after hello',async()=>{
-  for(const id of ['bb-code-preview','bb-code-value','bb-copy-code','bb-code-actions','bb-pair-progress'])
+  for(const id of ['bb-code-preview','bb-code-value','bb-copy-code','bb-code-actions','bb-pair-progress','bb-code-state','bb-code-expiry','bb-health-check','bb-cancel-pair','bb-preview-status'])
     assert.ok(html.includes('id="'+id+'"'),'missing element '+id);
-  const listeners={},elements=new Map(),opened=new Set(),timers=[],copied=[];
+  const listeners={},elements=new Map(),opened=new Set(),timers=[],copied=[],intervals=[];
   function el(id){
     if(!elements.has(id))elements.set(id,{
       textContent:'',hidden:true,disabled:false,value:'',dataset:{},handlers:{},
@@ -96,20 +97,45 @@ test('inline setup displays and copies server code; chat opens only after hello'
   }}};
   const memory={getItem(){return null;},setItem(){},removeItem(){}};
   new Function('window','document','localStorage','sessionStorage','location',
-    'navigator','URL','setTimeout','confirm',auth)(
+    'navigator','URL','setTimeout','confirm','setInterval','clearInterval',auth)(
     win,doc,memory,memory,{origin:'https://bilabot.example.pages.dev'},
     {clipboard:{async writeText(code){copied.push(code);}}},
-    FakeURL,fn=>{timers.push(fn);},()=>true
+    FakeURL,fn=>{timers.push(fn);},()=>true,fn=>{intervals.push(fn);return 1;},()=>{}
   );
   const emit=(phase,rest={})=>listeners['bilabot:pairing']({detail:{phase,...rest}});
   emit('checking');emit('code',{code:'004201'});
   assert.equal(el('bb-code-value').textContent,'004201');
   assert.equal(el('bb-code-actions').hidden,false);
+  assert.equal(el('bb-code-state').textContent,'MÃ OTA THẬT');
+  assert.equal(el('bb-setup').dataset.phase,'code');
+  assert.match(el('bb-code-expiry').textContent,/^\\d+:\\d{2}$/);
+  assert.equal(el('bb-cancel-pair').hidden,false);
   await el('bb-copy-code').handlers.click();
   assert.deepEqual(copied,['004201']);
   emit('paired');assert.equal(opened.has('bilabot-open'),false);
+  assert.equal(el('bb-code-expiry').hidden,true);
   emit('connected');assert.equal(opened.has('bilabot-open'),false);
   timers.forEach(fn=>fn());assert.equal(opened.has('bilabot-open'),true);
   emit('error',{message:'Gateway unavailable'});
   assert.equal(el('bb-auth-error').textContent,'Gateway unavailable');
+  let cancellations=0;
+  win.XiaozhiDebug={provisioning:{cancel(){cancellations++;}}};
+  emit('code',{code:'001233'});
+  el('bb-cancel-pair').handlers.click();
+  assert.equal(cancellations,1);
+  assert.equal(el('bb-code-actions').hidden,true);
+  assert.equal(el('bb-setup').dataset.phase,'cancelled');
+  emit('error',{message:'Đã hủy ghép nối'});
+  assert.equal(el('bb-setup').dataset.phase,'cancelled');
+});
+
+test('Olivia-themed landing contains the actual setup, chat preview and responsive dark styling',()=>{
+  assert.ok(html.includes('id="bilabot-gate"'));
+  assert.ok(html.includes('id="bb-setup"'));
+  assert.ok(html.includes('id="bb-open-app"'));
+  assert.ok(html.includes('olivia-theme.css'));
+  assert.ok(html.includes('rel="noopener noreferrer" href="https://xiaozhi.me/console/agents"'));
+  assert.ok(theme.includes('.bb-preview-shell'));
+  assert.ok(theme.includes('@media(max-width:620px)'));
+  assert.ok(theme.includes('#bb-setup[data-phase="code"]'));
 });
