@@ -109,3 +109,11 @@ test('explicit setup fragment opens drawer for previously paired user',()=>{
   ctx.emit('bilabot:app-ready');
   assert.equal(ctx.classes.has('bb-setup-open'),true);
 });
+
+test('dashboard fragment skips automatic OTA drawer even before first pairing',()=>{
+  const ctx=bootstrap({paired:false,backend:''});
+  ctx.window.location.hash='#bb-dashboard';
+  ctx.emit('bilabot:app-ready');
+  assert.equal(ctx.classes.has('bb-setup-open'),false);
+  assert.equal(ctx.classes.has('bilabot-open'),true);
+});
