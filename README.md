@@ -1,35 +1,37 @@
-# BilaBot — Giao diện và Hono trên cùng Cloudflare Pages
+# BilaBot — trợ lý XiaoZhi AI và bảng điều khiển đơn sắc
 
-BilaBot là trợ lý giọng nói XiaoZhi AI tiếng Việt dựa trên [Olivia AI](https://github.com/roalfb/olivia-ai) (MIT), hỗ trợ thiết bị ESP32 ảo, mã kích hoạt OTA **thực**, WebSocket, Opus/WASM, STT/TTS và MCP. Không cần đăng nhập Google riêng trong BilaBot.
+BilaBot là ứng dụng trợ lý giọng nói tiếng Việt chạy trên trình duyệt, phát triển dựa trên [Olivia AI](https://github.com/roalfb/olivia-ai) (MIT). BilaBot hỗ trợ nhiều trợ lý, thiết bị ESP32 ảo, mã OTA **do XiaoZhi cấp**, WebSocket, Opus, STT/TTS và MCP.
 
-**Điểm truy cập:** https://xulytiengviet.github.io/Bilabot/ — khi chủ dự án cấu hình địa chỉ Cloudflare Pages thật, URL này tự điều hướng tới ứng dụng đầy đủ. GitHub Pages thuần không thể chạy Hono hoặc gắn custom WebSocket headers.
+**Mở ứng dụng:** https://xulytiengviet.github.io/Bilabot/  
+**Bảng điều khiển tiếng Việt:** https://xulytiengviet.github.io/Bilabot/#bb-dashboard  
+**Lấy mã và ghép nối:** https://xulytiengviet.github.io/Bilabot/#bb-setup
 
-## Giao diện Olivia-style Studio
+## Dashboard cài đặt đơn sắc (đen · trắng · xám)
 
-Landing BilaBot được thiết kế như không gian trò chuyện AI: thanh bên đa trợ lý minh họa, khung hội thoại, tông màu đêm tím-xanh, hiệu ứng âm thanh, thẻ ghép nối nổi bật và bố cục tối ưu máy tính lẫn điện thoại. Giao diện ứng dụng trợ lý thật nằm bên trong `docs/static/app.js`; phần minh họa trang chủ được đánh dấu rõ để không nhầm với kết nối thực.
+Dashboard hiển thị trực tiếp trong giao diện trợ lý kiểu Olivia AI. Trên thanh bên hoặc tiêu đề hội thoại, nhấn **Cài đặt / Bảng điều khiển**. Bảy mục được Việt hóa: **Tổng quan**, **Trợ lý AI**, **Kết nối XiaoZhi**, **Thiết bị ảo**, **Giao thức**, **Giọng nói** và **Sao lưu & dữ liệu**.
 
-**Luồng người dùng:** mở `https://xulytiengviet.github.io/Bilabot/#bb-setup` → đăng nhập riêng tại XiaoZhi.me → nhấn **Lấy mã kích hoạt** → xem mã do OTA trả về → **Sao chép mã** và nhập trong phần thêm thiết bị của AI Agent trên XiaoZhi → BilaBot tự thăm dò kết quả, kiểm tra lại OTA và nhận token thiết bị → đợi WebSocket nhận `hello` → giao diện trò chuyện tự mở. Trong khi chờ, trang hiển thị tiến trình và thời hạn mã. Có nút hủy và thử lại.
+- **Tổng quan:** tên và số lượng trợ lý, trạng thái ghép nối, WebSocket và gateway; truy cập nhanh màn hình nhận mã OTA.
+- **Kết nối XiaoZhi:** nhập URL Cloudflare Pages gateway HTTPS, kiểm tra `GET /api/health`, lưu cấu hình, chỉnh WebSocket / OTA cho từng trợ lý, mở giao diện nhập mã.
+- **Thiết bị / Giao thức / Giọng nói:** chỉnh Device ID (MAC), Client ID (UUID), phiên bản giao thức, khung âm thanh, chế độ lắng nghe, micro và TTS.
+- **Dữ liệu:** sử dụng đúng chức năng xuất/nhập backup JSON đã có của Olivia/BilaBot. Các ID điều khiển và cơ chế lưu hiện hữu được giữ nguyên.
 
-**Không tạo mã giả:** nếu máy chủ chưa cấp mã, proxy chưa triển khai, Turnstile lỗi hoặc ghép nối hết hạn, BilaBot hiển thị thông báo cụ thể. Nút kiểm tra gateway đọc `GET /api/health`; chỉ coi gateway sẵn sàng khi `ready:true` và có Turnstile site key.
+Giao diện di động có thanh chọn mục ngang và bảng cài đặt toàn màn hình. Nút **Lấy mã OTA** mở lại cửa sổ ghép nối ngay trong BilaBot; mã có số 0 ở đầu được giữ nguyên, có nút sao chép và theo dõi phản hồi ghép nối. Chỉ xác nhận kết nối sau khi XiaoZhi trả `hello` qua WebSocket.
 
-**Triển khai bắt buộc để nhận mã thật:** trang GitHub Pages chỉ phục vụ HTML/CSS/JS. Cần kết nối cùng repository vào **Cloudflare Pages** bằng `npm run build:pages` (thư mục `dist`), cấu hình Turnstile và ba secret như [hướng dẫn](docs/SETUP.md), rồi khai báo `CLOUDFLARE_PAGES_URL` cho GitHub Actions để điểm truy cập GitHub tự chuyển sang ứng dụng có Hono. Có thể nhập URL gateway thủ công trong phần Cấu hình nâng cao nếu muốn giữ trang GitHub Pages (đồng thời cần cấu hình origin tương ứng trên gateway).
-
-**Kiểm thử:** `npm test` bao gồm kiểm thử mô phỏng OTA thực giả lập, xác nhận sau OTA/check, mã có số 0 đầu, sao chép, trạng thái, hủy ghép nối và cấu trúc responsive. Đây không thay thế kiểm thử OTA trực tiếp sau khi Cloudflare và XiaoZhi đã được thiết lập.
-
-## Kiến trúc
+## Kiến trúc và triển khai
 
 ```text
-GitHub Pages (điểm truy cập) → Cloudflare Pages (một dự án)
-                                  ├─ docs/: landing và web app tiếng Việt
-                                  └─ _worker.js: Hono → OTA/WS/vision relay
-                                                           │
-                                                           ▼
-                                                   XiaoZhi chính thức
+GitHub Pages — UI Olivia + Dashboard tiếng Việt
+                 │  HTTPS/CORS/WebSocket ticket
+                 ▼
+Cloudflare Pages — giao diện + Hono gateway
+                 │  OTA / WebSocket / âm thanh
+                 ▼
+        Máy chủ XiaoZhi chính thức
 ```
 
-Trình duyệt xử lý UI, Web Audio, Opus WASM và MCP. Hono gắn Device-Id, Client-Id và Authorization khi bắt tay WebSocket. Gateway yêu cầu Turnstile, HMAC transport session và vé WebSocket AES-GCM 60 giây; không đưa token thiết bị thô vào URL. Người dùng đăng nhập Google **chỉ trên** https://xiaozhi.me/console/agents và nhập mã thực do OTA trả về. BilaBot không thể đọc cookie phiên XiaoZhi.
+GitHub Pages **không thể tự chạy Hono hoặc thêm custom WebSocket headers**. Cần triển khai Cloudflare Pages từ cùng repository và cấu hình Turnstile/secrets trước khi nhận mã OTA thật. Điểm truy cập GitHub **không tự chuyển hướng**: frontend sử dụng `CLOUDFLARE_PAGES_URL` hoặc URL gateway bạn tự nhập tại Dashboard. Cloudflare phải cho phép origin `https://xulytiengviet.github.io` và Turnstile phải hỗ trợ hostname đang chạy.
 
-## Chạy thử và triển khai
+[Hướng dẫn Cloudflare Pages chi tiết](docs/SETUP.md).
 
 ```bash
 npm ci
@@ -38,6 +40,6 @@ npm run build:pages
 npx wrangler pages dev dist
 ```
 
-Kết nối repo `xulytiengviet/Bilabot` với Cloudflare Pages (Git integration, nhánh `main`): build `npm run build:pages`, output `dist`, Node 22. Cấu hình Turnstile và ba secret trên Cloudflare; sau khi site thật hoạt động, đặt GitHub Actions variable `CLOUDFLARE_PAGES_URL` để tự điều hướng địa chỉ GitHub Pages. Hướng dẫn 3 bước: [docs/SETUP.md](docs/SETUP.md).
+**Giới hạn:** Khi chưa cấu hình gateway, nút kiểm tra sẽ thông báo chưa sẵn sàng; không tạo mã hoặc báo ghép nối giả. Không yêu cầu mật khẩu, access token Google hay cookie của tài khoản XiaoZhi. Token thiết bị có thể lưu cục bộ trên trình duyệt; chỉ sử dụng gateway do bạn tin cậy. Đăng nhập XiaoZhi riêng tại https://xiaozhi.me/console/agents.
 
-**Bảo mật:** Không lưu mật khẩu, Google token hoặc XiaoZhi website cookie trong BilaBot. Token thiết bị và hội thoại có thể lưu cục bộ trên thiết bị người dùng. Bật WAF/rate-limiting khi triển khai công khai. Phần mềm độc lập, không phải sản phẩm chính thức XiaoZhi. Xem [chính sách quyền riêng tư](docs/privacy-policy.html) và [LICENSE](LICENSE).
+BilaBot là dự án độc lập, không phải sản phẩm chính thức của XiaoZhi. Xem [LICENSE](LICENSE) và [chính sách quyền riêng tư](docs/privacy-policy.html).
