@@ -169,3 +169,50 @@ body.bb-mono-settings #globalSettingsPanel{display:none!important}
  #settingsPanel.bb-mono-dashboard{transition:none!important}
  #settingsPanel .bb-db-tab{transition:none!important}
 }
+
+/* Explicit access to the dashboard from both Olivia-style app surfaces. */
+#app .bb-sidebar-dashboard-cta{width:100%;min-height:40px;margin-top:8px;
+  display:flex;align-items:center;justify-content:center;gap:9px;border:1px solid #777;
+  border-radius:9px;background:#222;color:#fff;font:750 11px Inter,system-ui,sans-serif;cursor:pointer}
+#app .bb-sidebar-dashboard-cta:hover{background:#444}
+#app .bb-header-dashboard-btn{border:1px solid #7a7a7a;background:#222;color:#fff}
+#app .bb-header-dashboard-btn:hover{background:#404040}
+body.bb-mono-settings.bb-setup-open #bilabot-gate .bb-signin{
+  background:#f8f8f8!important;color:#1c1c1c;border-left:1px solid #d9d9d9;
+  box-shadow:-20px 0 70px #0004}
+body.bb-mono-settings.bb-setup-open #bilabot-gate .bb-signin :is(h2,h3,h4,p,.bb-step-heading strong){color:#212121}
+body.bb-mono-settings.bb-setup-open #bilabot-gate :is(.bb-setup-desc,.bb-step-content>p,.bb-step-label,#bb-code-hint){color:#727272}
+body.bb-mono-settings.bb-setup-open #bilabot-gate .bb-direct-drawer-head{color:#555;border-color:#dadada}
+body.bb-mono-settings.bb-setup-open #bilabot-gate .bb-direct-drawer-head span i{color:#151515}
+body.bb-mono-settings.bb-setup-open #bilabot-gate .bb-direct-drawer-head button{color:#111;background:#fff;border:1px solid #ddd}
+body.bb-mono-settings.bb-setup-open #bilabot-gate .bb-beta-tag,
+body.bb-mono-settings.bb-setup-open #bilabot-gate .bb-step-label{background:#f0f0f0;color:#525252;border-color:#dfdfdf}
+body.bb-mono-settings.bb-setup-open #bilabot-gate .bb-flow{background:#fff;border:1px solid #ddd}
+body.bb-mono-settings.bb-setup-open #bilabot-gate .bb-flow li>span{background:#eee;border-color:#ccc;color:#555}
+body.bb-mono-settings.bb-setup-open #bilabot-gate .bb-flow li>small{color:#777}
+body.bb-mono-settings.bb-setup-open #bb-setup :is(.bb-flow li>span,.bb-step-badge-num){background:#ececec;border-color:#cfcfcf;color:#252525;box-shadow:none}
+body.bb-mono-settings.bb-setup-open #bb-setup[data-phase="code"] #bb-flow-console>span,
+body.bb-mono-settings.bb-setup-open #bb-setup[data-phase="paired"] .bb-flow li>span,
+body.bb-mono-settings.bb-setup-open #bb-setup[data-phase="connected"] .bb-flow li>span{background:#262626;color:#fff;border-color:#262626}
+body.bb-mono-settings.bb-setup-open #bilabot-gate .bb-pair-button{background:#1b1b1b;color:#fff;box-shadow:none}
+body.bb-mono-settings.bb-setup-open #bilabot-gate .bb-xiaozhi-button{background:#fff;color:#222!important;border-color:#cecece}
+body.bb-mono-settings.bb-setup-open #bilabot-gate .bb-code-preview{background:#fff!important;border:1px dashed #bebebe!important}
+body.bb-mono-settings.bb-setup-open #bilabot-gate .bb-code-preview[data-phase="code"]{border-color:#4b4b4b!important}
+body.bb-mono-settings.bb-setup-open #bilabot-gate #bb-code-value{color:#222!important}
+body.bb-mono-settings.bb-setup-open #bilabot-gate .bb-code-live{color:#777!important}
+body.bb-mono-settings.bb-setup-open #bilabot-gate .bb-code-live i{color:#444!important;box-shadow:none!important}
+body.bb-mono-settings.bb-setup-open #bilabot-gate .bb-pair-progress{color:#5f5f5f}
+body.bb-mono-settings.bb-setup-open #bilabot-gate :is(.bb-auth-footer,.bb-pair-tracker){border-color:#e3e3e3}
+body.bb-mono-settings.bb-setup-open #bilabot-gate .bb-connection{color:#444}
+body.bb-mono-settings.bb-setup-open #bilabot-gate .bb-state-dot{background:#454545;box-shadow:none}
+body.bb-mono-settings.bb-setup-open #bilabot-gate #bb-copy-code{background:#1b1b1b;color:#fff;border-color:#1b1b1b}
+body.bb-mono-settings.bb-setup-open #bilabot-gate #bb-open-pair-console{background:#fff;border-color:#bcbcbc;color:#222}
+body.bb-mono-settings.bb-setup-open #bilabot-gate .bb-selfconfig{background:#fff;border:1px solid #dedede}
+body.bb-mono-settings.bb-setup-open #bilabot-gate .bb-selfconfig summary{color:#333}
+body.bb-mono-settings.bb-setup-open #bilabot-gate .bb-selfconfig :is(input,select){background:#fff;border:1px solid #d2d2d2;color:#242424}
+body.bb-mono-settings.bb-setup-open #bilabot-gate #bb-health-check{background:#fff;border-color:#c3c3c3;color:#333}
+body.bb-mono-settings.bb-setup-open #bilabot-gate .bb-direct-assistant-tools button{background:#fff;border-color:#d1d1d1;color:#222}
+body.bb-mono-settings.bb-setup-open #bilabot-gate .bb-setup-guide{color:#333!important}
+@media(max-width:600px){
+ #app .bb-header-dashboard-btn,#app .bb-header-setup-btn{min-width:33px;max-width:37px}
+}
