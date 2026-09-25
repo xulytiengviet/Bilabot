@@ -194,7 +194,13 @@
   $('bb-open-dashboard-chat')?.addEventListener('click',openDashboard);
   $('bb-open-dashboard-sidebar')?.addEventListener('click',openDashboard);
   window.addEventListener('bilabot:pairing',refreshSummary);
-  window.addEventListener('bilabot:app-ready',()=>{refreshSummary();syncGateway();});
+  window.addEventListener('bilabot:app-ready',()=>{
+    refreshSummary();syncGateway();
+    if(window.location.hash==='#bb-dashboard')openDashboard();
+  });
+  window.addEventListener('hashchange',()=>{
+    if(window.location.hash==='#bb-dashboard')openDashboard();
+  });
   $('closeSettingsBtn')?.addEventListener('click',()=>{
     // Native UIController handles closing. Any validation message is cleared here.
     if($('bb-db-validation'))$('bb-db-validation').hidden=true;
