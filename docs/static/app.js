@@ -4985,6 +4985,13 @@ const UIController = (() => {
   function showPairingModal(code, message) {
     const overlay = el('pairingOverlay');
     if (!overlay) return;
+    // Direct BilaBot setup already shows this server-issued code in a
+    // persistent drawer. Never cover it with the legacy modal.
+    if (window.BilaBotDirect?.isOpen?.()) {
+      overlay.style.display = 'none';
+      updatePairingStatus(ProvisioningManager.PAIRING_STATES.PAIRING_PENDING, code);
+      return;
+    }
 
     if (el('pairingCodeDisplay')) el('pairingCodeDisplay').textContent = code || '------';
     if (el('pairingMessage') && message) {
@@ -5580,6 +5587,9 @@ const UIController = (() => {
     updatePairingStatusDisplay,
     renderAssistantList,
     renderActiveAssistantHeader,
+    // Direct setup can open the exact Olivia assistant settings panel.
+    openSettingsFor,
+    closeSettings,
     // PHASE 4: expose the current settings target id for AvatarSystem
     getSettingsTargetIdPublic: () => getSettingsTargetId(),
   };
