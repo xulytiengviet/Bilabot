@@ -178,14 +178,14 @@
         <span class="olivia-wordmark device-name" id="deviceNameDisplay" role="img" aria-label="BilaBot"></span>
         <div class="device-status" id="deviceStatusBadge">
           <span class="status-dot offline" id="statusDot"></span>
-          <span id="statusText">Offline</span>
+          <span id="statusText">Ngoại tuyến</span>
         </div>
       </div>
-      <button class="theme-toggle-btn" id="themeToggleBtn" title="Toggle light/dark theme">
+      <button class="theme-toggle-btn" id="themeToggleBtn" title="Đổi giao diện sáng/tối">
         <i class="fas fa-sun icon-sun"></i>
         <i class="fas fa-moon icon-moon"></i>
       </button>
-      <button class="global-settings-btn" id="globalSettingsBtn" title="Settings">
+      <button class="global-settings-btn" id="globalSettingsBtn" title="Cài đặt">
         <i class="fas fa-gear"></i>
       </button>
     </div>
@@ -235,7 +235,7 @@
            UIController.renderAssistantList() from AssistantManager's
            stored assistants. See public./static/app.js. -->
       <div id="assistantListItems"></div>
-      <button class="add-assistant-btn" id="addAssistantBtn" title="Add a new assistant">
+      <button class="add-assistant-btn" id="addAssistantBtn" title="Thêm trợ lý mới">
         <i class="fas fa-plus"></i>
         <span>Thêm trợ lý</span>
       </button>
@@ -243,7 +243,7 @@
 
     <!-- Audio Level Meter -->
     <div class="audio-meter-section" id="audioMeterSection" style="display:none;">
-      <div class="audio-meter-label"><i class="fas fa-microphone"></i> Input Level</div>
+      <div class="audio-meter-label"><i class="fas fa-microphone"></i> Mức đầu vào</div>
       <div class="audio-meter-bar">
         <div class="audio-meter-fill" id="audioMeterFill"></div>
       </div>
@@ -258,7 +258,7 @@
        which is scoped to a single assistant's configuration. -->
   <div class="global-settings-panel" id="globalSettingsPanel">
     <div class="settings-header">
-      <h2><i class="fas fa-gear"></i> Settings</h2>
+      <h2><i class="fas fa-gear"></i> Cài đặt</h2>
       <button class="close-settings-btn" id="closeGlobalSettingsBtn"><i class="fas fa-times"></i></button>
     </div>
     <div class="settings-body">
@@ -268,9 +268,9 @@
 
         <div class="form-group">
           <button class="btn-primary btn-block" type="button" id="exportDataBtn">
-            <i class="fas fa-file-export"></i> Export BilaBot Data
+            <i class="fas fa-file-export"></i> Xuất dữ liệu BilaBot
           </button>
-          <small>Downloads a complete backup of all your BilaBot data as a JSON file.</small>
+          <small>Tải về bản sao lưu toàn bộ dữ liệu BilaBot dưới dạng JSON.</small>
         </div>
 
         <div class="form-group">
@@ -280,9 +280,9 @@
 
         <div class="form-group">
           <button class="btn-secondary btn-block" type="button" id="importDataBtn">
-            <i class="fas fa-file-import"></i> Import BilaBot Data
+            <i class="fas fa-file-import"></i> Nhập dữ liệu BilaBot
           </button>
-          <small>Restore from a previously exported BilaBot backup file (.json).</small>
+          <small>Khôi phục từ tệp sao lưu BilaBot (.json).</small>
           <input type="file" id="importFileInput" accept=".json,application/json" style="display:none;" />
         </div>
       </div>
@@ -298,9 +298,9 @@
     <div class="import-confirm-card">
       <div class="import-confirm-header">
         <i class="fas fa-file-import"></i>
-        <h3>Import Backup</h3>
+        <h3>Nhập bản sao lưu</h3>
       </div>
-      <p class="import-confirm-message">Importing this backup will replace your current BilaBot data. This cannot be undone.</p>
+      <p class="import-confirm-message">Nhập bản sao lưu sẽ thay thế dữ liệu BilaBot hiện tại; không thể hoàn tác.</p>
       <div class="import-confirm-meta" id="importConfirmMeta"></div>
       <div class="import-confirm-actions">
         <button class="btn-secondary" type="button" id="importCancelBtn">Cancel</button>
@@ -320,7 +320,7 @@
        fields, never assuming "the active one". See app.js openSettingsFor(). -->
   <div class="settings-panel" id="settingsPanel">
     <div class="settings-header">
-      <h2><i class="fas fa-cog"></i> Assistant Settings</h2>
+      <h2><i class="fas fa-cog"></i> Cài đặt trợ lý</h2>
       <button class="close-settings-btn" id="closeSettingsBtn"><i class="fas fa-times"></i></button>
     </div>
     <div class="settings-body">
@@ -329,7 +329,7 @@
         <h3>Trợ lý</h3>
         <div class="form-group">
           <label for="assistantNameInput">Tên trợ lý</label>
-          <input type="text" id="assistantNameInput" placeholder="My Assistant" />
+          <input type="text" id="assistantNameInput" placeholder="Trợ lý của tôi" />
           <small>Shown in the AI Assistants sidebar list and chat header</small>
         </div>
         <!-- PHASE 4: Avatar management inside settings -->
@@ -341,7 +341,7 @@
             </div>
             <div class="settings-avatar-actions">
               <button class="btn-secondary" type="button" id="settingsUploadAvatarBtn">
-                <i class="fas fa-upload"></i> Upload New Image
+                <i class="fas fa-upload"></i> Tải ảnh mới
               </button>
               <button class="btn-secondary btn-small-danger" type="button" id="settingsRemoveAvatarBtn">
                 <i class="fas fa-trash"></i> Remove
@@ -351,12 +351,12 @@
           <small>PNG, JPG, JPEG, WEBP &mdash; auto-resized to 256&times;256</small>
         </div>
         <div class="form-group">
-          <label>Connection Status</label>
+          <label>Trạng thái kết nối</label>
           <div class="pairing-status-display" id="assistantConnectionStatusDisplay">Disconnected</div>
         </div>
         <div class="form-group settings-connection-actions">
           <button class="btn-secondary" type="button" id="settingsReconnectBtn">
-            <i class="fas fa-plug"></i> Connect / Reconnect
+            <i class="fas fa-plug"></i> Kết nối / Kết nối lại
           </button>
           <button class="btn-secondary" type="button" id="settingsDisconnectBtn">
             <i class="fas fa-plug-circle-xmark"></i> Disconnect
@@ -364,14 +364,14 @@
         </div>
         <div class="form-group">
           <button class="btn-danger btn-block" type="button" id="deleteAssistantBtn">
-            <i class="fas fa-trash"></i> Delete Assistant
+            <i class="fas fa-trash"></i> Xóa trợ lý
           </button>
           <small>Cannot delete the last remaining assistant</small>
         </div>
       </div>
 
       <div class="settings-section">
-        <h3>Connection</h3>
+        <h3>Kết nối</h3>
         <div class="form-group">
           <label for="wsUrlInput">WebSocket URL</label>
           <input type="text" id="wsUrlInput" placeholder="wss://api.xiaozhi.me/xiaozhi/v1/"
@@ -385,8 +385,8 @@
           <small>Device registration endpoint (same as ESP32 firmware)</small>
         </div>
         <div class="form-group">
-          <label>Pairing Status</label>
-          <div class="pairing-status-display" id="pairingStatusDisplay">Not paired</div>
+          <label>Trạng thái ghép nối</label>
+          <div class="pairing-status-display" id="pairingStatusDisplay">Chưa ghép nối</div>
           <small>Devices pair automatically via 6-digit code at xiaozhi.me</small>
         </div>
         <div class="form-group">
@@ -578,7 +578,7 @@
             <button class="plus-menu-item plus-menu-disabled" id="menuPhotosBtn" disabled>
               <i class="fas fa-image"></i>
               <span>Photos</span>
-              <span class="coming-soon-badge">Soon</span>
+              <span class="coming-soon-badge">Sắp có</span>
             </button>
             <div class="plus-menu-divider"></div>
             <button class="plus-menu-item plus-menu-disabled" disabled>
@@ -590,14 +590,14 @@
         </div>
 
         <!-- Voice button -->
-        <button class="toolbar-btn mic-btn" id="micBtn" title="Hold to speak / Click to toggle">
+        <button class="toolbar-btn mic-btn" id="micBtn" title="Giữ để nói / Nhấn để bật hoặc tắt micro">
           <i class="fas fa-microphone" id="micIcon"></i>
         </button>
         <!-- Text input -->
         <div class="input-wrapper">
           <textarea
             id="messageInput"
-            placeholder="Type a message... (Enter to send)"
+            placeholder="Nhập tin nhắn... (Enter để gửi)"
             rows="1"
           ></textarea>
         </div>
@@ -608,7 +608,7 @@
       </div>
       <div class="input-status-bar" id="inputStatusBar">
         <span id="charCount"></span>
-        <span id="inputHint">Connect to server to start chatting</span>
+        <span id="inputHint">Kết nối máy chủ để bắt đầu trò chuyện</span>
       </div>
     </div>
 
@@ -810,14 +810,14 @@
     <div class="pairing-code" id="pairingCodeDisplay">------</div>
     <p class="bb-pair-help"><a href="https://xiaozhi.me/console/agents" target="_blank" rel="noopener noreferrer">Mở tài khoản XiaoZhi và thêm thiết bị ↗</a></p>
     <button class="btn-secondary pairing-copy-btn" type="button" id="copyPairingCodeBtn">
-      <i class="fas fa-copy"></i> Copy Code
+      <i class="fas fa-copy"></i> Sao chép mã
     </button>
     <div class="pairing-status-row">
       <i class="fas fa-circle-notch fa-spin" id="pairingStatusIcon"></i>
       <span id="pairingStatusText">Đang chờ ghép nối...</span>
     </div>
     <button class="btn-secondary pairing-cancel-btn" type="button" id="cancelPairingBtn">
-      Cancel
+      Hủy ghép nối
     </button>
   </div>
 </div>
