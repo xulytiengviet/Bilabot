@@ -108,7 +108,7 @@ test('inline setup displays and copies server code; chat opens only after hello'
   assert.equal(el('bb-code-actions').hidden,false);
   assert.equal(el('bb-code-state').textContent,'MÃ OTA THẬT');
   assert.equal(el('bb-setup').dataset.phase,'code');
-  assert.match(el('bb-code-expiry').textContent,/^\\d+:\\d{2}$/);
+  assert.match(el('bb-code-expiry').textContent,/^\d+:\d{2}$/);
   assert.equal(el('bb-cancel-pair').hidden,false);
   await el('bb-copy-code').handlers.click();
   assert.deepEqual(copied,['004201']);
