@@ -1,7 +1,7 @@
 /* BilaBot Studio v4 — Olivia-inspired dark conversational workspace.
    Original styling for the app itself remains in static/style.css (Olivia MIT).
    This file scopes the landing and setup to #bilabot-gate only. */
-:root {color-scheme:dark}
+#bilabot-gate {color-scheme:dark}
 #bilabot-gate.bb-gate {
   --studio-surface:#121a2d;--studio-elevated:#1a253c;--studio-border:rgba(166,183,233,.15);
   --studio-muted:#96a5c0;--studio-text:#edf2ff;--studio-mint:#86eed3;--studio-violet:#ab94ff;
