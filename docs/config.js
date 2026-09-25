@@ -1,7 +1,10 @@
-/** Public connection configuration. NO Google Client ID or password required.
- * To use the OFFICIAL XiaoZhi server from GitHub Pages, the site owner must
- * deploy worker/ with Turnstile and supply its PUBLIC workers.dev URL.
- * Direct mode works only if a self-hosted server explicitly supports
- * cross-origin OTA and WebSocket authentication without custom headers.
+/** BilaBot PUBLIC configuration; commit only public client IDs and Worker URLs here.
+ * Google Identity Services (GIS) signs into BilaBot. XiaoZhi console login
+ * remains separate; XiaoZhi alone issues device activation codes.
  */
-window.BILABOT_CONFIG=Object.freeze({ workerUrl:'',mode:'gateway',autoPair:false });
+window.BILABOT_CONFIG = Object.freeze({
+  workerUrl: '', // https://bilabot-gateway.<your-account>.workers.dev
+  googleClientId: '', // ...apps.googleusercontent.com (public, never client secret)
+  mode: 'gateway',
+  autoPair: true
+});
