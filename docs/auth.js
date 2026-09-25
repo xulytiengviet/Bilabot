@@ -218,7 +218,7 @@
     const host = ui('bb-google-button');
     if (host) window.google.accounts.id.renderButton(host, {
       theme: 'outline', type: 'standard', text: 'signin_with',
-      shape: 'pill', size: 'large', width: 298, logo_alignment: 'left'
+      shape: 'pill', size: 'large', width: Math.min(298, Math.round(host?.getBoundingClientRect().width || 298)), logo_alignment: 'left'
     });
     return true;
   }
