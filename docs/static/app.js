@@ -122,8 +122,8 @@
 
 'use strict';
 
-// GitHub Pages is static. All OTA, vision and WebSocket handshake requests
-// go to the self-hosted BilaBot Worker after Google ID-token verification.
+// Cloudflare Pages runs the Hono relay on the same origin. GitHub Pages is
+// an optional entry point; only Turnstile protects relay sessions.
 const BilaBotGateway = {
   get bridge() {
     const value=window.BilaBotBridge;
@@ -132,7 +132,7 @@ const BilaBotGateway = {
   },
   get base(){
     const url=this.bridge.apiBase;
-    if(!url)throw new Error('Chưa cấu hình Worker. GitHub Pages không thể đặt custom headers WebSocket cho XiaoZhi chính thức.');
+    if(!url)throw new Error('Chưa có Cloudflare Pages Hono proxy. GitHub Pages không thể tự đặt WebSocket headers.');
     return url;
   },
   async fetch(path,options={}){

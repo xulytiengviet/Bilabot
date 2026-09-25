@@ -5,6 +5,10 @@ on:
     branches: [main]
     paths:
       - "docs/**"
+      - "cloudflare/**"
+      - "package.json"
+      - "tests/**"
+      - "README.md"
       - "worker/src/**"
       - "worker/tests/**"
       - ".github/workflows/pages.yml"
@@ -36,6 +40,23 @@ jobs:
           node --test worker/tests/*.test.mjs
           test -f docs/index.html
           test -f docs/.nojekyll
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Validate unified Cloudflare Pages build
+        run: |
+          npm ci
+          npm test
+          npm run build:pages
+          test -f dist/_worker.js
+      - name: Configure Cloudflare destination (optional)
+        env:
+          CLOUDFLARE_PAGES_URL: ${{ vars.CLOUDFLARE_PAGES_URL }}
+        run: |
+          if [ -n "$CLOUDFLARE_PAGES_URL" ]; then
+            node -e "const u=new URL(process.env.CLOUDFLARE_PAGES_URL);if(u.protocol!=='https:')process.exit(1);require('fs').writeFileSync('docs/deploy.js','window.BILABOT_DEPLOY_URL = '+JSON.stringify(u.origin)+';'+String.fromCharCode(10))"
+          fi
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:

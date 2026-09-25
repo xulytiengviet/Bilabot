@@ -1,68 +1,37 @@
-# BilaBot · Thiết lập Google GIS, XiaoZhi và GitHub Pages
+# BilaBot · Một dự án Cloudflare Pages (giao diện + Hono)
 
-Luồng: Google Identity Services (BilaBot) → đăng nhập riêng trên XiaoZhi → OTA nhận mã thực → ghép nối AI Agent → WebSocket / Opus / STT / TTS / MCP.
+**Điểm truy cập quen thuộc:** https://xulytiengviet.github.io/Bilabot/  
+**Ứng dụng đầy đủ:** địa chỉ `https://<tên-dự-án>.pages.dev/` do Cloudflare cấp khi tạo dự án.
 
-**Hai phiên đăng nhập độc lập:** Google GIS chỉ xác thực tại BilaBot. Trang GitHub Pages không thể sử dụng lại cookie, access token hay phiên Google của xiaozhi.me. Chỉ OTA XiaoZhi có quyền cấp mã kích hoạt thiết bị.
+Không cần Google Identity Services riêng cho BilaBot, không cần Workers độc lập. Người dùng đăng nhập Google **chỉ tại** https://xiaozhi.me/console/agents, nhận mã OTA thật tại BilaBot rồi ghép nối AI Agent trên XiaoZhi.
 
-## A. Cấu hình Google Identity Services
+## Ba bước thiết lập duy nhất một lần
 
-1. Vào https://console.cloud.google.com/apis/credentials, thiết lập OAuth consent screen và tạo OAuth 2.0 Client ID loại **Web application**.
-2. Trong **Authorized JavaScript origins**, khai báo chính xác **https://xulytiengviet.github.io**; khi thử trên localhost thêm **http://localhost:5173**. Không nhập đường dẫn /Bilabot vào trường origin.
-3. Điền public Client ID (kết thúc bằng .apps.googleusercontent.com) vào **googleClientId** trong docs/config.js.
-4. Điền chính xác cùng public Client ID vào biến **GOOGLE_CLIENT_ID** trong worker/wrangler.toml.
+1. Cloudflare Dashboard → **Workers & Pages → Create → Pages → Connect to Git** → kết nối repository `xulytiengviet/Bilabot`, chọn `main`. Chọn preset None, build command `npm run build:pages`, output directory `dist`, Node.js 22. Đây là **Git integration**, không cần Cloudflare API token trong GitHub Secrets.
+2. Sau khi Cloudflare cấp địa chỉ Pages, tạo **Cloudflare Turnstile** cho hostname Pages chính thức (ví dụ `your-project.pages.dev`). Trong Pages → Settings → Variables and Secrets đặt biến **TURNSTILE_SITE_KEY** (công khai) và ba biến dạng **Secret**: `TURNSTILE_SECRET`, `SESSION_SECRET` (ít nhất 32 ký tự) và `TICKET_KEY` (64 ký tự hex). Sinh hai khóa bằng Node trên Windows/macOS/Linux:
+   ```bash
+   node -e "console.log(require('node:crypto').randomBytes(48).toString('base64'))"
+   node -e "console.log(require('node:crypto').randomBytes(32).toString('hex'))"
+   ```
+   Dòng 1 cho SESSION_SECRET, dòng 2 cho TICKET_KEY. Không commit secrets. Chạy **Retry deployment** sau khi thêm biến. Không phải điền workerUrl: Hono tự phát hiện origin hiện tại trên Cloudflare Pages.
+3. Khi bản Cloudflare đã hoạt động và `/api/health` trả `ready:true`, vào GitHub → **Settings → Secrets and variables → Actions → Variables** tạo **CLOUDFLARE_PAGES_URL** bằng địa chỉ Pages HTTPS thật. Chạy lại workflow **Deploy BilaBot GitHub Pages**. URL GitHub Pages cũ sẽ tự điều hướng tới bản Cloudflare Pages.
 
-Không bao giờ commit OAuth Client Secret, JWT cá nhân hay cookie. Nút đăng nhập dùng google.accounts.id.initialize() và renderButton(). Google ID token được gửi qua HTTPS tới Worker để xác minh chữ ký từ Google JWKS, audience, issuer và hạn dùng trước khi cấp transport session.
+Không được suy đoán địa chỉ `pages.dev` trước khi Cloudflare xác nhận dự án đã được tạo. Nếu muốn giữ nguyên UI trên GitHub Pages thay vì chuyển hướng, cần cấu hình thêm `PAGE_ORIGIN=https://xulytiengviet.github.io` trên Cloudflare và Turnstile cho cả hai hostname; mặc định không cần bước phụ này.
 
-## B. Thiết lập Cloudflare Worker
+## Kiểm tra nhanh
 
-1. Tạo Cloudflare Turnstile widget với hostname xulytiengviet.github.io, điền site key công khai vào TURNSTILE_SITE_KEY trong worker/wrangler.toml.
-2. Giữ PAGE_ORIGIN = "https://xulytiengviet.github.io" và khai báo GOOGLE_CLIENT_ID.
-3. Mở terminal ở thư mục worker và chạy lần lượt:
+```bash
+npm ci
+npm test
+npm run build:pages
+npx wrangler pages dev dist
+```
 
-    npm install
+Bản chạy local cần secrets thử nghiệm riêng bằng `.dev.vars` (không commit) và hostname localhost được Turnstile hỗ trợ nếu muốn thử thực tế. `/api/health` trả `ready:false` khi chưa cấu hình, không tạo mã kích hoạt giả. Bật Cloudflare WAF/rate limiting trước khi công bố ở quy mô lớn.
 
-    npx wrangler login
+## Người dùng: hai thao tác
 
-    npx wrangler secret put TURNSTILE_SECRET
+1. Mở https://xiaozhi.me/console/agents, đăng nhập Google trên trang chính thức và chọn AI Agent để thêm thiết bị.
+2. Vào BilaBot → **Tạo mã kích hoạt**, nhập mã OTA thực do BilaBot nhận được vào bảng điều khiển XiaoZhi. Sau ghép nối, ứng dụng chuyển âm thanh Opus/WASM, STT/TTS và MCP qua proxy Hono cùng tên miền. Không cần ESP32 vật lý.
 
-    npx wrangler secret put SESSION_SECRET
-
-    npx wrangler secret put TICKET_KEY
-
-    npm run deploy
-
-SESSION_SECRET ít nhất 32 ký tự; tạo bằng openssl rand -base64 48. TICKET_KEY đúng 64 ký tự hex; tạo bằng openssl rand -hex 32.
-
-4. Chép URL Worker sau triển khai vào **workerUrl** trong docs/config.js; ví dụ https://bilabot-gateway.YOUR-SUBDOMAIN.workers.dev.
-5. Kiểm tra /api/health bằng request có Origin https://xulytiengviet.github.io; phản hồi cần có ready=true, googleConfigured=true và turnstileSiteKey. Truy cập URL trực tiếp không có Origin có thể nhận HTTP 403 theo thiết kế.
-
-**Bảo vệ:** Worker dùng origin allowlist, Turnstile, xác minh Google ID token, relay session 1 giờ và vé WebSocket AES-GCM ngắn hạn. Chỉ cho phép các endpoint XiaoZhi được chỉ định. Bật thêm Cloudflare WAF/rate limit trước khi sử dụng công khai.
-
-## C. Công bố GitHub Pages
-
-Trong repository → Settings → Pages chọn **GitHub Actions**. Workflow .github/workflows/pages.yml xuất bản thư mục docs trên nhánh main lên https://xulytiengviet.github.io/Bilabot/ .
-
-Kiểm tra cú pháp trước khi đẩy lên GitHub:
-
-    node --check docs/auth.js
-    node --check docs/static/app.js
-    node --check worker/src/index.js
-
-## D. Luồng người dùng
-
-1. Nhấn **Đăng nhập Google** trên BilaBot. Khi Worker xác minh thành công và hoàn tất Turnstile, autoPair=true bắt đầu OTA tự động.
-2. Mở https://xiaozhi.me/console/agents, đăng nhập Google **tại trang chính thức**, chọn thêm thiết bị AI Agent.
-3. BilaBot hiển thị **mã thực** máy chủ OTA trả về. Nhập mã trên XiaoZhi; BilaBot tự thăm dò OTA/activate, kiểm tra lại OTA/check, nhận URL WSS và device token.
-4. Sau ghép nối, trình duyệt sử dụng micro/loa, Opus qua WebSocket, STT/TTS và MCP. Không cần ESP32 vật lý.
-
-Nếu thiếu Worker hoặc sai cấu hình, ứng dụng hiện lỗi và **không tạo mã giả**. Google Client ID chưa điền thì landing vẫn hoạt động ở chế độ xem, chưa có GIS thực. Chế độ direct chỉ dành cho máy chủ tự quản hỗ trợ CORS và xác thực WebSocket từ trình duyệt; không được xem là giải pháp kết nối thẳng với server chính thức.
-
-## E. Khắc phục sự cố và quyền riêng tư
-
-- Google origin_mismatch: origin của OAuth Web Client phải là https://xulytiengviet.github.io, không chứa /Bilabot.
-- Worker 503: thiếu secret hoặc Turnstile site key. Google login lỗi: kiểm tra client ID frontend và Worker phải trùng.
-- Không nhận mã: kiểm tra /api/ota/check và tab Debug; mã chỉ hợp lệ khi chính OTA trả về.
-- WebSocket thất bại: kiểm tra ghép nối, Worker và mã token, vì browser không tự gửi được custom WS headers như ESP32.
-- ID token Google chỉ giữ trong bộ nhớ trang, không ghi vào localStorage hay chuyển tới XiaoZhi. Worker xác minh chữ ký, sessionStorage giữ transport session và hồ sơ đã xác minh; localStorage có thể giữ token thiết bị theo cơ chế ứng dụng. Tránh máy dùng chung.
-
-Xem chính sách quyền riêng tư tại docs/privacy-policy.html và upstream Olivia AI (MIT): https://github.com/roalfb/olivia-ai .
+**Mã nguồn:** `docs/` là UI dùng chung, `cloudflare/src/index.js` là Hono Pages Advanced Mode, `worker/src/index.js` là lõi OTA/WebSocket/vision tái sử dụng, `dist/_worker.js` là bundle deploy. GitHub Pages thuần không thể thực thi Hono; điểm truy cập GitHub sẽ chuyển hướng sau khi bạn khai báo địa chỉ Cloudflare thật.
