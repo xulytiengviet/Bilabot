@@ -125,28 +125,73 @@
 // GitHub Pages is static. All OTA, vision and WebSocket handshake requests
 // go to the self-hosted BilaBot Worker after Google ID-token verification.
 const BilaBotGateway = {
-  get base() {
-    const url = window.BilaBotAuth?.apiBase;
-    if (!url) throw new Error('Chưa cấu hình Cloudflare Worker trong BilaBot.');
+  get bridge() {
+    const value=window.BilaBotBridge;
+    if(!value)throw new Error('BilaBot chưa khởi tạo. Vui lòng tải lại trang.');
+    return value;
+  },
+  get base(){
+    const url=this.bridge.apiBase;
+    if(!url)throw new Error('Chưa cấu hình Worker. GitHub Pages không thể đặt custom headers WebSocket cho XiaoZhi chính thức.');
     return url;
   },
-  async fetch(path, options = {}) {
-    const session = window.BilaBotAuth?.sessionToken;
-    if (!session) throw new Error('Vui lòng đăng nhập Google trước khi kết nối XiaoZhi.');
-    const headers = new Headers(options.headers || {});
-    headers.set('Authorization', 'Bearer ' + session);
-    return fetch(new URL(path, this.base), { ...options, headers, mode: 'cors' });
+  async fetch(path,options={}){
+    if(this.bridge.mode==='direct'){
+      if(path==='/api/ota/check'||path==='/api/ota/activate'){
+        const d=JSON.parse(options.body||'{}');
+        if(!d.otaUrl)throw new Error('Chưa có URL OTA.');
+        const target=new URL(d.otaUrl);
+        if(path.endsWith('/activate'))target.pathname=target.pathname.endsWith('/') ? target.pathname+'activate' : target.pathname+'/activate';
+        try{
+          return await fetch(target.href,{method:'POST',mode:'cors',credentials:'omit',
+            headers:{
+              'Content-Type':'application/json','Activation-Version':'1',
+              'Device-Id':d.deviceId,'Client-Id':d.clientId,'Accept-Language':'vi-VN'
+            },body:JSON.stringify(d.payload||{})});
+        }catch{
+          throw new Error('Máy chủ OTA không cho phép truy cập trực tiếp từ trình duyệt (CORS). '
+            +'BilaBot không đọc cookie XiaoZhi. Hãy chuyển sang chế độ proxy tối giản.');
+        }
+      }
+      if(path==='/api/vision/explain'){
+        const headers=new Headers(options.headers||{});
+        const endpoint=headers.get('X-Vision-Url');
+        const token=headers.get('X-Vision-Token');
+        if(!endpoint)throw new Error('Máy chủ chưa cung cấp địa chỉ xử lý hình ảnh.');
+        const u=new URL(endpoint);if(u.protocol==='http:')u.protocol='https:';
+        headers.delete('X-Vision-Url');headers.delete('X-Vision-Token');
+        headers.set('Authorization',token?.startsWith('Bearer ')?token:'Bearer '+token);
+        try{return await fetch(u.href,{...options,headers,mode:'cors',credentials:'omit'});}
+        catch{throw new Error('Không thể upload ảnh trực tiếp do CORS; cần proxy hoặc máy chủ tương thích.');}
+      }
+      throw new Error('Endpoint này không hỗ trợ ở chế độ kết nối trực tiếp.');
+    }
+    const token=await this.bridge.ensureSession();
+    const headers=new Headers(options.headers||{});
+    headers.set('Authorization','Bearer '+token);
+    return fetch(new URL(path,this.base),{...options,headers,mode:'cors',credentials:'omit'});
   },
-  async websocketTicket(params) {
-    const response = await this.fetch('/api/ws-ticket', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(params)
+  async websocketTicket(params){
+    if(this.bridge.mode==='direct'){
+      // Standard JS WebSocket NEVER supports custom request headers.
+      // Do not put token in query strings to bypass authentication.
+      const u=new URL(params.url);
+      if(u.protocol!=='wss:'||
+        ['api.xiaozhi.me','api.tenclass.net','xiaozhi.me'].includes(u.hostname))
+        throw new Error('XiaoZhi chính thức yêu cầu Authorization, Device-Id và Client-Id '
+          +'trong WebSocket handshake. Trình duyệt không đặt được các header này. '
+          +'Cần proxy hoặc máy chủ đã hỗ trợ trực tiếp một cơ chế xác thực riêng.');
+      return u.href; // only for opted-in servers not requiring custom headers
+    }
+    const response=await this.fetch('/api/ws-ticket',{
+      method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify(params)
     });
-    const data = await response.json().catch(() => ({}));
-    if (!response.ok || !data.ticket) throw new Error(data.error || 'Không cấp được phiên WebSocket.');
-    const url = new URL('/api/ws', this.base);
-    url.protocol = url.protocol === 'https:' ? 'wss:' : 'ws:';
-    url.searchParams.set('ticket', data.ticket);
+    const data=await response.json().catch(()=>({}));
+    if(!response.ok||!data.ticket)throw new Error(data.error||'Không cấp được phiên WebSocket.');
+    const url=new URL('/api/ws',this.base);
+    url.protocol=url.protocol==='https:'?'wss:':'ws:';
+    url.searchParams.set('ticket',data.ticket);
     return url.href;
   }
 };
@@ -2554,7 +2599,7 @@ const ProtocolClient = (() => {
         token: s.token,
         protocol_version: String(s.protocolVersion || 1)
       });
-      Logger.ws('Connecting via BilaBot Worker → ' + s.wsUrl);
+      Logger.ws('Connecting via ' + (window.BilaBotBridge?.mode==='direct'?'direct compatible server':'BilaBot Worker') + ' → ' + s.wsUrl);
 
       ws = new WebSocket(finalUrl);
       ws.binaryType = 'arraybuffer';

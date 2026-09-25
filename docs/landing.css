@@ -1,10 +1,6 @@
 /* BilaBot GitHub Pages landing — original responsive voice/chat UI remains behind the auth gate. */
 :root { --bb-dark: #061c27; --bb-primary: #16c7a8; }
-body:not(.bilabot-authed) { overflow-y: auto; }
-body:not(.bilabot-authed) #app,
-body:not(.bilabot-authed) #loadingOverlay,
-body:not(.bilabot-authed) #pairingOverlay { display:none!important; }
-body.bilabot-authed #bilabot-gate { display: none; }
+body:not(.bilabot-open){overflow-y:auto;}
 [hidden] { display: none !important; }
 .bb-gate { position: relative; min-height: 100dvh; width: 100%; z-index: 10000; isolation: isolate;
  color: #e8f8f8; background: radial-gradient(ellipse at 12% 22%, #10454e 0, transparent 48%),
@@ -70,3 +66,23 @@ body.bilabot-authed #bilabot-gate { display: none; }
 .bb-intro>p{font-size:15px}}
 @media(max-width:470px){.bb-nav-right{gap:13px;font-size:11px}.bb-nav{height:70px}.bb-brand{font-size:20px}
 .bb-brand-sub{display:none}.bb-signin{padding:29px 20px}.bb-intro h1{font-size:43px}}
+
+/* Revamp 2026-09-25: Official XiaoZhi login only; no secondary Google account. */
+body:not(.bilabot-open) #app,body:not(.bilabot-open) #loadingOverlay,
+body:not(.bilabot-open) #pairingOverlay { display:none!important; }
+body.bilabot-open #bilabot-gate {display:none!important;}
+.bb-signin .bb-primary-action,.bb-signin .bb-secondary-action,.bb-signin .bb-tertiary-action {
+ width:100%;display:flex;align-items:center;justify-content:center;text-align:center;
+ padding:14px 15px;border-radius:12px;cursor:pointer;min-height:45px;
+ font:700 13px/1.4 Inter,system-ui,sans-serif;text-decoration:none;border:0;margin:12px 0;
+}
+.bb-signin .bb-primary-action {background:linear-gradient(110deg,#078d83,#16b99e);color:white;}
+.bb-signin .bb-secondary-action {background:#e3f6ef;color:#086657;border:1px solid #a1dccc;}
+.bb-signin .bb-tertiary-action {background:transparent;color:#315d54;border:1px solid #cfdfd9;}
+.bb-signin .bb-primary-action:hover,.bb-signin .bb-secondary-action:hover {filter:brightness(.94)}
+.bb-selfconfig select {width:100%;border:1px solid #bfcfc9;border-radius:8px;padding:11px;
+ color:#173c3a;font-size:12px;background:#fff;}
+.bb-turnstile{margin:18px auto;width:fit-content;max-width:100%;}
+.bb-turnstile[hidden]{display:none!important;}
+.bb-identity a{font-weight:700;color:var(--primary,#078d83);text-decoration:none;}
+.bb-signin>p{margin:0 0 16px;}

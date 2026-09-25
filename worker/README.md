@@ -1,54 +1,57 @@
-# BilaBot Gateway — Cloudflare Worker
+# Cloudflare Worker tối giản cho BilaBot (không đăng nhập Google lần hai)
 
-Proxy tự lưu trữ cho frontend GitHub Pages `https://xulytiengviet.github.io/Bilabot/`.
+Người dùng đăng nhập Google **chỉ tại** [xiaozhi.me/console/agents](https://xiaozhi.me/console/agents). Worker không nhận cookie của trang này, không lấy access token Google, không truy cập Gmail và không cấp mã kích hoạt XiaoZhi. Đây chỉ là cầu nối giao thức thiết bị cho browser và bảo vệ bằng **Cloudflare Turnstile** chống truy cập ồ ạt.
 
-## Yêu cầu
+## Vì sao cần Worker khi kết nối XiaoZhi chính thức?
 
-- Tài khoản Cloudflare và `npx wrangler login`
-- Google Cloud OAuth 2.0 **Web application Client ID** (không phải Gmail API)
-- Thêm origin `https://xulytiengviet.github.io` vào Authorized JavaScript origins
-- Có tài khoản XiaoZhi tại `https://xiaozhi.me`
+ESP32 gửi OTA với `Activation-Version`, `Device-Id`, `Client-Id`; WebSocket yêu cầu custom `Authorization`, `Protocol-Version`, `Device-Id`, `Client-Id`. Browser thông thường không tự tạo được tất cả handshake headers trên WebSocket, còn CORS có thể chặn OTA/vision từ GitHub Pages. Worker chỉ chuyển tiếp các request này, còn Opus, UI, MCP vẫn ở phía trình duyệt.
 
-## Thiết lập
+## Thiết lập Cloudflare
 
-```bash
-cd worker
-npm install
-npx wrangler login
-npx wrangler secret put GOOGLE_CLIENT_ID
-# Dán YOUR_CLIENT_ID.apps.googleusercontent.com
-npx wrangler secret put SESSION_SECRET
-# Dán một chuỗi ngẫu nhiên >=32 ký tự, VD: openssl rand -base64 48
-npx wrangler secret put TICKET_KEY
-# Dán chuỗi HEX 64 ký tự tạo bằng openssl rand -hex 32
-npm run deploy
+1. Trên Cloudflare Turnstile, tạo site với hostname `xulytiengviet.github.io`. Sao chép **site key** (công khai) và **secret key** (bí mật).
+2. Điền `TURNSTILE_SITE_KEY` công khai vào `worker/wrangler.toml`:
+   ```toml
+   [vars]
+   PAGE_ORIGIN = "https://xulytiengviet.github.io"
+   TURNSTILE_SITE_KEY = "YOUR_PUBLIC_TURNSTILE_SITE_KEY"
+   ```
+3. Trong thư mục `worker/`:
+   ```bash
+   npm install
+   npx wrangler login
+   npx wrangler secret put TURNSTILE_SECRET
+   npx wrangler secret put SESSION_SECRET
+   npx wrangler secret put TICKET_KEY
+   npm run deploy
+   ```
+   `SESSION_SECRET` phải dài tối thiểu 32 ký tự, có thể tạo bằng `openssl rand -base64 48`. `TICKET_KEY` là chuỗi 64 ký tự HEX tạo bằng `openssl rand -hex 32`.
+4. Chép URL Worker công khai vào `docs/config.js`:
+   ```js
+   window.BILABOT_CONFIG = Object.freeze({
+     workerUrl: 'https://bilabot-gateway.YOUR-SUBDOMAIN.workers.dev',
+     mode: 'gateway',
+     autoPair: false
+   });
+   ```
+5. Bật GitHub Pages (Actions) trên repository. Người dùng không cần điền bất cứ khóa hay client ID nào.
+
+## Luồng xác thực và truyền dữ liệu
+
+```text
+[XiaoZhi official Google login] -- riêng trên xiaozhi.me/console/agents
+[BilaBot GitHub Pages] -- Cloudflare Turnstile --> [BilaBot Worker]
+[Worker] -- Session HMAC 1 giờ --> [Browser]
+[Browser] -- OTA check (Device-ID/Client-ID) --> [Worker] --> [XiaoZhi OTA]
+[XiaoZhi OTA] -- activation.code --> [BilaBot hiện mã]
+[User] -- nhập mã trên xiaozhi.me/console/agents --> [XiaoZhi kích hoạt thiết bị]
+[BilaBot] -- OTA activate/check --> [XiaoZhi cấp token thiết bị, WSS URL]
+[BilaBot] -- WS ticket AES-GCM 60s --> [Worker] --> [XiaoZhi WSS với header]
 ```
 
-Sao chép địa chỉ Worker dạng `https://bilabot-gateway.<your-account>.workers.dev`.
-Đặt tên miền đó và Google Client ID công khai vào `docs/config.js` ở repository chính:
+Người dùng thấy mã **chỉ khi máy chủ OTA trả mã thật**. Không tạo mã ngẫu nhiên giả lập. Worker không thể tự biết người dùng đã đăng nhập Google trên tab khác.
 
-```js
-window.BILABOT_CONFIG = Object.freeze({
-  workerUrl: 'https://bilabot-gateway.YOUR-ACCOUNT.workers.dev',
-  googleClientId: 'YOUR_CLIENT_ID.apps.googleusercontent.com',
-  autoPair: true
-});
-```
+## Giới hạn bảo mật
 
-Không commit `SESSION_SECRET`, `TICKET_KEY`, Gmail password hoặc access token vào GitHub.
-Nếu không muốn sửa config.js, có thể nhập hai **giá trị công khai** trên giao diện “Tự cấu hình” lưu riêng trong trình duyệt.
+Origin check không phải cơ chế chống lạm dụng duy nhất; Cloudflare Turnstile được bắt buộc trước khi cấp session. Thiết lập thêm WAF/rate limits cho `/api/auth/session`, `/api/ota/*`, `/api/ws-ticket` và WebSocket; tránh ghi secrets và payload vào access logs. Token thiết bị nằm ở trình duyệt và Worker nhận ngắn hạn để tạo header cho endpoint chính thức. Sử dụng HTTPS, không chia sẻ mã và token trên máy công cộng.
 
-## Luồng
-
-Google Identity Services → mã JWT (ID token) → Worker kiểm tra chữ ký RS256 bằng Google JWKS, issuer, audience, hạn dùng, email verified → session HMAC 1 giờ. OTA/check trả **mã kích hoạt XiaoZhi thực** (nếu thiết bị chưa ghép nối). Người dùng nhập mã tại bảng điều khiển XiaoZhi một lần. OTA/activate báo 200, client lấy device token và WS URL. Client lấy opaque AES-GCM WS ticket 60 giây, sau đó nối WSS với Worker. Worker thêm custom headers và relay Opus/JSON/MCP tới máy chủ XiaoZhi.
-
-Google không phát hành mã ghép nối XiaoZhi. Cách triển khai này không sử dụng cookie đăng nhập XiaoZhi và không hứa SSO xuyên tên miền.
-
-## Kiểm thử
-
-```bash
-cd worker
-npx wrangler dev
-```
-
-Truy cập frontend `https://xulytiengviet.github.io/Bilabot/`; Worker chỉ chấp nhận Origin cấu hình `PAGE_ORIGIN`. Bạn có thể thêm `http://localhost:8000` vào `PAGE_ORIGIN` phân tách bằng dấu phẩy khi phát triển. Với Production, cấu hình Cloudflare Rate Limiting và quan sát log **không ghi token**. Lưu ý cookie đăng nhập Google độc lập với tài khoản XiaoZhi.
+Để vận hành hoàn toàn **không gateway**, cần máy chủ XiaoZhi tương thích với browser, công khai CORS và cơ chế xác thực qua WebSocket API trình duyệt; phiên cookie trên xiaozhi.me không thể chia sẻ với github.io.

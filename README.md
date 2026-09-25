@@ -1,11 +1,12 @@
-# BilaBot — Web AI trên GitHub Pages
+# BilaBot — XiaoZhi Web AI (không đăng nhập Google riêng)
 
-**Giao diện:** https://xulytiengviet.github.io/Bilabot/  
+**Trang web:** https://xulytiengviet.github.io/Bilabot/  
 **Mã nguồn:** https://github.com/xulytiengviet/Bilabot  
-**Thiết lập Pages + Google OAuth + Cloudflare Worker:** [docs/SETUP.md](docs/SETUP.md)  
-**Triển khai Gateway:** [worker/README.md](worker/README.md)
+**Hướng dẫn:** [docs/SETUP.md](docs/SETUP.md) · [Worker](worker/README.md)
 
-Trang GitHub Pages có landing tiếng Việt theo phong cách Olivia, đăng nhập Google Identity Services, tự chạy OTA provisioning để **nhận mã kích hoạt do máy chủ XiaoZhi cấp**, sau đó ghép nối trên xiaozhi.me và sử dụng WebSocket, Opus, STT/TTS, MCP. Chủ ứng dụng **phải triển khai Cloudflare Worker và cấu hình Google OAuth Client ID** một lần trước khi khách truy cập sử dụng. Google không đăng nhập hộ người dùng vào XiaoZhi; bước ghép nối đầu tiên vẫn bắt buộc.
+**Luồng chính xác:** Mở https://xiaozhi.me/console/agents và đăng nhập Google **tại XiaoZhi**, quay lại BilaBot, nhấn **Tạo mã kích hoạt**. BilaBot tạo danh tính ESP32 ảo và hiển thị **mã do XiaoZhi OTA thực sự cấp**, để bạn thêm thiết bị vào AI Agent của tài khoản XiaoZhi. Sau khi ghép nối, ứng dụng sử dụng micro/loa, Opus/WebSocket, STT/TTS và MCP.
+
+**Giới hạn:** Browser trên GitHub Pages không thể dùng lại cookie đăng nhập Google từ xiaozhi.me hoặc tự tạo custom WebSocket headers. Để sử dụng XiaoZhi **chính thức**, chủ website phải triển khai Cloudflare Worker nhỏ (có Turnstile, không yêu cầu Google OAuth lần hai). Chế độ trình duyệt trực tiếp chỉ dành cho máy chủ tự quản có CORS và giao thức WS hỗ trợ browser. **Không có mã kích hoạt thật nếu thiếu kết nối OTA thành công.**
 
 ---
 

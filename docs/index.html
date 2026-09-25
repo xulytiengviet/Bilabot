@@ -27,48 +27,57 @@
   <link rel="stylesheet" href="./static/style.css" />
 <link rel="stylesheet" href="./landing.css"/>
 <script src="./config.js"></script>
-<script src="https://accounts.google.com/gsi/client" async defer></script>
+<script src="https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit" async defer></script>
 </head>
 <body>
 <div id="bilabot-gate" class="bb-gate">
   <nav class="bb-nav">
-    <a class="bb-brand" href="./" aria-label="BilaBot"><span class="bb-brand-icon">B</span><b>BilaBot</b><span class="bb-brand-sub">WEB AI</span></a>
-    <div class="bb-nav-right"><a href="https://xiaozhi.me/console/login?redirect=%2Fconsole%2F" target="_blank" rel="noopener noreferrer">Bảng điều khiển XiaoZhi ↗</a>
+    <a class="bb-brand" href="./" aria-label="BilaBot"><span class="bb-brand-icon">B</span><b>BilaBot</b><span class="bb-brand-sub">XIAOZHI WEB AI</span></a>
+    <div class="bb-nav-right"><a href="https://xiaozhi.me/console/agents" target="_blank" rel="noopener noreferrer">Quản lý AI Agent ↗</a>
     <a href="https://github.com/xulytiengviet/Bilabot" target="_blank" rel="noopener noreferrer">GitHub ↗</a></div>
   </nav>
   <main class="bb-hero">
     <div class="bb-intro">
-      <div class="bb-eyebrow">TRỢ LÝ GIỌNG NÓI · XIAOZHI ESP32 ẢO</div>
-      <h1>Trò chuyện với AI.<br><span>Ngay trên trình duyệt.</span></h1>
-      <p>Không cần ESP32. BilaBot biến Chrome hoặc Edge thành trợ lý giọng nói với WebSocket, Opus, nhận dạng tiếng nói, TTS và MCP.</p>
+      <div class="bb-eyebrow">BILABOT · TRÌNH DUYỆT GIẢ LẬP ESP32</div>
+      <h1>Trợ lý XiaoZhi.<br><span>Trực tiếp trên web.</span></h1>
+      <p>Dùng chính tài khoản Google mà bạn đã liên kết với XiaoZhi. BilaBot không có hệ thống đăng nhập Google riêng; ứng dụng chỉ tạo định danh thiết bị ảo, nhận mã kích hoạt từ XiaoZhi và trò chuyện qua giao diện BilaBot.</p>
       <div class="bb-badges"><span>◉ WebSocket</span><span>♫ Opus / WASM</span><span>✦ MCP</span><span>◈ Camera</span></div>
-      <div class="bb-steps"><div><strong>01</strong><span>Đăng nhập Google vào BilaBot.</span></div><div><strong>02</strong><span>BilaBot tự yêu cầu mã kích hoạt XiaoZhi.</span></div><div><strong>03</strong><span>Nhập mã tại xiaozhi.me một lần và bắt đầu trò chuyện.</span></div></div>
-      <small>Google chỉ xác thực tài khoản BilaBot. Bạn nhập mã ghép nối ở website XiaoZhi chính thức, không nhập mật khẩu XiaoZhi tại đây.</small>
+      <div class="bb-steps">
+        <div><strong>01</strong><span>Mở <b>xiaozhi.me/console/agents</b> và đăng nhập Google tại trang chính thức.</span></div>
+        <div><strong>02</strong><span>Quay lại BilaBot, nhấn <b>Tạo mã kích hoạt</b>. Mã thực do máy chủ XiaoZhi cấp.</span></div>
+        <div><strong>03</strong><span>Thêm thiết bị trong XiaoZhi bằng mã trên màn hình; sau đó sử dụng micro, loa và MCP trong BilaBot.</span></div>
+      </div>
+      <small>Không sao chép cookie/phiên đăng nhập XiaoZhi. Để sử dụng máy chủ XiaoZhi chính thức từ GitHub Pages, chủ website cần cấu hình proxy WebSocket và OTA có bảo vệ chống lạm dụng.</small>
     </div>
     <section class="bb-signin" aria-labelledby="bb-gate-title">
-      <div class="bb-ai-avatar">✳</div><span class="bb-pill">BẮT ĐẦU</span>
-      <h2 id="bb-gate-title">Gặp gỡ BilaBot</h2>
-      <p>Đăng nhập Google để nhận mã kích hoạt thiết bị ảo tự động từ XiaoZhi.</p>
+      <div class="bb-ai-avatar">✳</div><span class="bb-pill">KẾT NỐI XIAOZHI</span>
+      <h2 id="bb-gate-title">Bắt đầu với BilaBot</h2>
+      <p>Không tạo tài khoản BilaBot. Đăng nhập một lần trên trang XiaoZhi và sử dụng mã kích hoạt thiết bị.</p>
+      <a class="bb-primary-action" href="https://xiaozhi.me/console/agents" target="_blank" rel="noopener noreferrer" id="bb-open-xiaozhi">① Đăng nhập Google trên XiaoZhi ↗</a>
+      <button class="bb-secondary-action" id="bb-pair-start" type="button">② Tôi đã đăng nhập · Tạo mã kích hoạt</button>
+      <button class="bb-tertiary-action" id="bb-open-app" type="button">Mở giao diện BilaBot không kết nối →</button>
       <div id="bb-auth-error" class="bb-error" role="alert" hidden></div>
-      <div id="bb-google-btn" class="bb-google"></div>
-      <p id="bb-auth-status" class="bb-hint" role="status">Đang kiểm tra cấu hình dịch vụ...</p>
+      <div id="bb-turnstile" class="bb-turnstile" hidden></div>
+      <p id="bb-auth-status" class="bb-hint" role="status">Mã kích hoạt sẽ xuất hiện sau khi kết nối thành công với OTA XiaoZhi.</p>
       <details class="bb-selfconfig" id="bb-selfconfig">
-        <summary>Tự cấu hình (dành cho người triển khai)</summary>
-        <label for="bb-api-input">Địa chỉ Cloudflare Worker (HTTPS)</label>
+        <summary>Cấu hình kết nối nâng cao</summary>
+        <label for="bb-relay-mode">Chế độ kết nối</label>
+        <select id="bb-relay-mode">
+          <option value="gateway">XiaoZhi chính thức · Proxy tối giản (cần cấu hình)</option>
+          <option value="direct">Trình duyệt trực tiếp · Chỉ dành cho server cho phép CORS và WebSocket không cần custom headers</option>
+        </select>
+        <label for="bb-api-input">Cloudflare Worker URL (dành cho chủ ứng dụng)</label>
         <input id="bb-api-input" type="url" placeholder="https://bilabot-gateway.tenban.workers.dev" autocomplete="off"/>
-        <label for="bb-client-input">Google OAuth Web Client ID (công khai)</label>
-        <input id="bb-client-input" type="text" placeholder="...apps.googleusercontent.com" autocomplete="off"/>
-        <button id="bb-save-config" type="button">Lưu cấu hình trên trình duyệt</button>
-        <p class="bb-hint">Hai giá trị này phải khớp với Worker do bạn triển khai. Không nhập client secret, token cá nhân hay mật khẩu vào trang này.</p>
+        <button id="bb-save-config" type="button">Lưu cấu hình trên thiết bị này</button>
+        <p class="bb-hint">Không nhập Google OAuth Client ID, mật khẩu hoặc cookie. Chế độ trực tiếp không thể vượt chính sách CORS hoặc tự thêm header WebSocket của XiaoZhi.</p>
       </details>
-      <a class="bb-xiaozhi" href="https://xiaozhi.me/console/login?redirect=%2Fconsole%2F" target="_blank" rel="noopener noreferrer">Chưa có tài khoản XiaoZhi? Mở trang chính thức ↗</a>
+      <a class="bb-xiaozhi" href="https://github.com/xulytiengviet/Bilabot/blob/main/docs/SETUP.md" target="_blank">Hướng dẫn thiết lập dành cho chủ website ↗</a>
     </section>
   </main>
-  <footer class="bb-footer">BilaBot · Long Ngo · Dựa trên Olivia AI (MIT) ·
-    <a href="./privacy-policy.html">Chính sách quyền riêng tư</a> ·
-    <a href="https://github.com/78/xiaozhi-esp32" target="_blank" rel="noopener noreferrer">XiaoZhi Protocol</a></footer>
+  <footer class="bb-footer">BilaBot · Long Ngo · Phát triển từ Olivia AI (MIT) ·
+    <a href="./privacy-policy.html">Quyền riêng tư</a> ·
+    <a href="https://github.com/78/xiaozhi-esp32" target="_blank" rel="noopener noreferrer">Giao thức XiaoZhi</a></footer>
 </div>
-
 
 <!-- ╔══════════════════════════════════════════════════════════╗
      ║              APP ROOT CONTAINER                         ║
@@ -102,13 +111,13 @@
     <section class="bilabot-login-box" aria-label="Kết nối tài khoản XiaoZhi">
       <div class="bilabot-login-label">BẮT ĐẦU VỚI XIAOZHI</div>
       <a class="bilabot-login-link" target="_blank" rel="noopener noreferrer"
-         href="https://xiaozhi.me/console/login?redirect=%2Fconsole%2F">
+         href="https://xiaozhi.me/console/agents">
         <i class="fas fa-arrow-up-right-from-square"></i> Đăng nhập XiaoZhi
       </a>
       <p>Đăng nhập tại trang chính thức, quay lại BilaBot và nhấn nút Kết nối (biểu tượng phích cắm). Lần đầu cần nhập mã kích hoạt thiết bị ảo.</p>
     </section>
 
-    <div class="bb-identity" id="bb-identity" hidden><span id="bb-user-label">Google</span><button type="button" id="bb-logout">Đăng xuất</button></div>
+    <div class="bb-identity" id="bb-identity"><a href="https://xiaozhi.me/console/agents" target="_blank" rel="noopener noreferrer">↗ AI Agent trên XiaoZhi</a><button type="button" id="bb-return-home">Trang chủ</button></div>
     <!-- Navigation Tabs -->
     <div class="sidebar-tabs">
       <button class="tab-btn active" data-tab="chat">
@@ -708,16 +717,16 @@
 <div class="pairing-overlay" id="pairingOverlay" style="display:none;">
   <div class="pairing-card">
     <a class="bilabot-login-link" target="_blank" rel="noopener noreferrer"
-       href="https://xiaozhi.me/console/login?redirect=%2Fconsole%2F">Đăng nhập XiaoZhi để ghép nối ↗</a>
+       href="https://xiaozhi.me/console/agents">Đăng nhập XiaoZhi để ghép nối ↗</a>
     <div class="pairing-header">
       <i class="fas fa-link"></i>
       <h2 id="pairingTitle">Kích hoạt BilaBot</h2>
     </div>
     <p class="pairing-message" id="pairingMessage">
-      Đăng nhập <a href="https://xiaozhi.me/console/login?redirect=%2Fconsole%2F" target="_blank" rel="noopener noreferrer">trang chính thức XiaoZhi</a>, thêm thiết bị và nhập mã kích hoạt bên dưới.
+      Đăng nhập <a href="https://xiaozhi.me/console/agents" target="_blank" rel="noopener noreferrer">trang chính thức XiaoZhi</a>, thêm thiết bị và nhập mã kích hoạt bên dưới.
     </p>
     <div class="pairing-code" id="pairingCodeDisplay">------</div>
-    <p class="bb-pair-help"><a href="https://xiaozhi.me/console/login?redirect=%2Fconsole%2F" target="_blank" rel="noopener noreferrer">Mở tài khoản XiaoZhi và thêm thiết bị ↗</a></p>
+    <p class="bb-pair-help"><a href="https://xiaozhi.me/console/agents" target="_blank" rel="noopener noreferrer">Mở tài khoản XiaoZhi và thêm thiết bị ↗</a></p>
     <button class="btn-secondary pairing-copy-btn" type="button" id="copyPairingCodeBtn">
       <i class="fas fa-copy"></i> Copy Code
     </button>

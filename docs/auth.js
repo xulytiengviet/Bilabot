@@ -1,176 +1,118 @@
-/* BilaBot Google Identity Services bootstrap for a STATIC GitHub Pages site.
- * Google sign-in authenticates BilaBot only; XiaoZhi device activation is
- * separate and the real activation code is returned from OTA provisioning.
- * Google ID credentials remain in memory until sent to the trusted Worker.
- * Only the short-lived Worker session is saved in sessionStorage.
+/**
+ * BilaBot browser shell: use official XiaoZhi website for Google login.
+ * A cross-origin GitHub Pages app CANNOT read that Google/XiaoZhi session.
+ * The device activation code is only obtained from XiaoZhi OTA.
+ * Official XiaoZhi requires a small gateway for OTA/CORS and WebSocket
+ * custom headers. A direct mode is exposed ONLY for compatible self-hosts.
  */
 (function () {
   'use strict';
-  const BASE = 'bilabot-gateway-config-v1';
-  const SESSION = 'bilabot-session-v1';
-  const gate = document.getElementById('bilabot-gate');
-  const status = document.getElementById('bb-auth-status');
-  const err = document.getElementById('bb-auth-error');
-  const googleBtn = document.getElementById('bb-google-btn');
-  const apiInput = document.getElementById('bb-api-input');
-  const clientInput = document.getElementById('bb-client-input');
-  const saveBtn = document.getElementById('bb-save-config');
-  const identity = document.getElementById('bb-identity');
-  const userLabel = document.getElementById('bb-user-label');
-  const logout = document.getElementById('bb-logout');
-  const fixed = window.BILABOT_CONFIG || {};
-  let local = {};
-  try { local = JSON.parse(localStorage.getItem(BASE) || '{}'); } catch {}
-  const settings = {
-    apiBase: (local.workerUrl || fixed.workerUrl || '').trim().replace(/\/+$/, ''),
-    clientId: (local.googleClientId || fixed.googleClientId || '').trim(),
-    autoPair: fixed.autoPair !== false
+  const SAVE='bilabot-connection-v2', SESSION='bilabot-transport-session-v2';
+  const ui=id=>document.getElementById(id), official='https://xiaozhi.me/console/agents';
+  const fixed=window.BILABOT_CONFIG||{};
+  let saved={};try{saved=JSON.parse(localStorage.getItem(SAVE)||'{}')}catch{}
+  const settings={
+    workerUrl: String(saved.workerUrl || fixed.workerUrl || '').trim().replace(/\/+$/,''),
+    mode: saved.mode==='direct'?'direct':(fixed.mode==='direct'?'direct':'gateway')
   };
-  let token = '';
-  let account = null;
-  let expiresAt = 0;
-  let apiReady = false;
-
-  function showError(message) {
-    err.hidden = false;
-    err.textContent = String(message || 'Không thể kết nối.');
-    status.textContent = 'Bạn có thể kiểm tra cấu hình và thử đăng nhập lại.';
+  let transportSession='', expiresAt=0, healthCache=null, pending=null;
+  const setStatus=message=>{if(ui('bb-auth-status'))ui('bb-auth-status').textContent=message;};
+  const showError=message=>{
+    const el=ui('bb-auth-error');if(el){el.hidden=false;el.textContent=message;}
+    setStatus('Có thể mở giao diện BilaBot để xem nhật ký kết nối và thử lại.');
+  };
+  const hideError=()=>{const el=ui('bb-auth-error');if(el){el.hidden=true;el.textContent='';}};
+  const validBase=()=>{
+    try{const u=new URL(settings.workerUrl);return u.protocol==='https:'||
+      (u.protocol==='http:'&&['localhost','127.0.0.1'].includes(u.hostname));}
+    catch{return false;}
+  };
+  async function health(){
+    if(healthCache)return healthCache;
+    if(!validBase())throw new Error('Chưa cấu hình Worker hợp lệ. Chế độ chính thức cần proxy; xem mục Cấu hình kết nối nâng cao.');
+    const res=await fetch(settings.workerUrl+'/api/health',{mode:'cors',cache:'no-store'});
+    if(!res.ok)throw new Error('Không truy cập được Worker ('+res.status+').');
+    const data=await res.json();
+    if(!data.ready||!data.turnstileSiteKey)throw new Error('Worker chưa thiết lập bảo vệ Turnstile hoặc các khóa bí mật.');
+    return(healthCache=data);
   }
-  function clearError() { err.hidden = true; err.textContent = ''; }
-  function readyConfig() {
-    if (!settings.apiBase || !settings.clientId) return false;
-    try {
-      const u = new URL(settings.apiBase);
-      return (u.protocol === 'https:' || (u.protocol === 'http:' &&
-        (u.hostname === 'localhost' || u.hostname === '127.0.0.1'))) &&
-        /^[a-zA-Z0-9_-]+-[a-zA-Z0-9_-]+\.apps\.googleusercontent\.com$/.test(settings.clientId);
-    } catch { return false; }
-  }
-  function login() {
-    if (!apiReady) return;
-    if (!window.google?.accounts?.id) {
-      showError('Chưa tải được Google Identity Services. Kiểm tra Internet hoặc tiện ích chặn theo dõi.');
-      return;
-    }
-    window.google.accounts.id.initialize({
-      client_id: settings.clientId,
-      callback: async function (response) {
-        clearError();
-        status.textContent = 'Đang xác thực tài khoản Google trên máy chủ BilaBot...';
-        try {
-          const res = await fetch(settings.apiBase + '/api/auth/google', {
-            method: 'POST', mode: 'cors',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ credential: response.credential })
-          });
-          const data = await res.json();
-          if (!res.ok || !data.session) throw new Error(data.error || 'Xác thực Google không thành công.');
-          acceptSession(data);
-        } catch (e) { showError(e.message); }
-      },
-      auto_select: false,
-      cancel_on_tap_outside: true
+  async function challenge(siteKey){
+    if(!window.turnstile?.render)throw new Error('Không tải được Cloudflare Turnstile. Vui lòng tắt tiện ích chặn captcha rồi thử lại.');
+    const holder=ui('bb-turnstile');if(!holder)throw new Error('Thiếu vùng Turnstile.');
+    holder.hidden=false;holder.replaceChildren();
+    setStatus('Xác nhận kết nối an toàn với proxy (không cần đăng nhập Google lần nữa)…');
+    return await new Promise((resolve,reject)=>{
+      const timeout=setTimeout(()=>reject(new Error('Hết thời gian xác thực Turnstile.')),90000);
+      try{
+        window.turnstile.render(holder,{sitekey:siteKey,theme:'light',
+          callback:token=>{clearTimeout(timeout);holder.hidden=true;resolve(token);},
+          'error-callback':()=>{clearTimeout(timeout);reject(new Error('Không xác thực được Turnstile.'));},
+          'expired-callback':()=>{clearTimeout(timeout);reject(new Error('Turnstile đã hết hạn, vui lòng thử lại.'))}
+        });
+      }catch(e){clearTimeout(timeout);reject(e);}
     });
-    googleBtn.replaceChildren();
-    window.google.accounts.id.renderButton(googleBtn, {
-      type: 'standard', theme: 'outline', size: 'large',
-      text: 'signin_with', locale: 'vi', shape: 'pill', width: 290
-    });
-    status.textContent = 'Đăng nhập Google để yêu cầu mã kích hoạt XiaoZhi tự động.';
   }
-  async function autoConnect() {
-    if (!settings.autoPair) return;
-    // The underlying Olivia-derived app initializes asynchronously.
-    // Only request OTA after the Worker session has been verified.
-    for (let i = 0; i < 35; i++) {
-      if (!token) return;
-      if (window.XiaozhiDebug?.quickTest) {
-        try {
-          status.textContent = 'Đang yêu cầu mã kích hoạt XiaoZhi...';
-          await window.XiaozhiDebug.quickTest();
-        } catch (e) {
-          console.warn('[BilaBot] OTA auto-pair:', e.message);
-        }
-        return;
+  async function ensureSession(){
+    if(settings.mode==='direct')return '';
+    if(transportSession&&expiresAt>Date.now()+15_000)return transportSession;
+    if(pending)return pending;
+    pending=(async()=>{
+      // Only issue a transport session; do not use or impersonate XiaoZhi login.
+      const cache=await health();
+      let stored=null;try{stored=JSON.parse(sessionStorage.getItem(SESSION)||'null')}catch{}
+      if(stored?.workerUrl===settings.workerUrl&&stored.expiresAt>Date.now()+20_000){
+        const resp=await fetch(settings.workerUrl+'/api/me',
+          {headers:{Authorization:'Bearer '+stored.token}});
+        if(resp.ok){transportSession=stored.token;expiresAt=stored.expiresAt;return transportSession;}
       }
-      await new Promise(resolve => setTimeout(resolve, 180));
-    }
-    console.warn('[BilaBot] Trợ lý chưa khởi tạo; có thể kết nối thủ công.');
+      const token=await challenge(cache.turnstileSiteKey);
+      const res=await fetch(settings.workerUrl+'/api/auth/session',{method:'POST',
+        headers:{'Content-Type':'application/json'},body:JSON.stringify({turnstileToken:token})});
+      const data=await res.json().catch(()=>({}));
+      if(!res.ok||!data.session)throw new Error(data.error||'Không cấp được phiên chuyển tiếp.');
+      transportSession=data.session;expiresAt=data.expiresAt;
+      sessionStorage.setItem(SESSION,JSON.stringify({workerUrl:settings.workerUrl,token:transportSession,expiresAt}));
+      setStatus('Phiên chuyển tiếp đã sẵn sàng. Đang yêu cầu mã từ XiaoZhi…');
+      return transportSession;
+    })().finally(()=>{pending=null;});
+    return pending;
   }
-  function acceptSession(data) {
-    token = data.session;
-    account = data.user || {};
-    expiresAt = Number(data.expiresAt) || 0;
-    try {
-      sessionStorage.setItem(SESSION, JSON.stringify({
-        token, account, expiresAt, apiBase: settings.apiBase
-      }));
-    } catch {}
-    document.body.classList.add('bilabot-authed');
-    if (identity) identity.hidden = false;
-    if (userLabel) userLabel.textContent = account.name || account.email || 'Google';
-    gate.setAttribute('aria-hidden', 'true');
-    autoConnect();
+  async function startPair(){
+    hideError();
+    setStatus('Đang khởi tạo thiết bị XiaoZhi ảo…');
+    try{
+      if(settings.mode==='gateway')await ensureSession();
+      document.body.classList.add('bilabot-open');
+      for(let i=0;i<50;i++){
+        if(window.XiaozhiDebug?.quickTest){
+          await window.XiaozhiDebug.quickTest();
+          return;
+        }
+        await new Promise(resolve=>setTimeout(resolve,120));
+      }
+      throw new Error('Giao diện chưa khởi tạo; hãy dùng nút Kết nối trong BilaBot.');
+    }catch(e){showError(e.message);document.body.classList.remove('bilabot-open');}
   }
-  async function restoreSession() {
-    let saved;
-    try { saved = JSON.parse(sessionStorage.getItem(SESSION) || 'null'); } catch {}
-    if (!saved || saved.apiBase !== settings.apiBase ||
-        !saved.token || Number(saved.expiresAt) < Date.now() + 60_000) return false;
-    try {
-      const res = await fetch(settings.apiBase + '/api/me', {
-        headers: { Authorization: 'Bearer ' + saved.token }
-      });
-      if (!res.ok) return false;
-      const data = await res.json();
-      acceptSession({ session: saved.token, user: data.user || saved.account, expiresAt: saved.expiresAt });
-      return true;
-    } catch { return false; }
-  }
-  async function boot() {
-    apiInput.value = settings.apiBase;
-    clientInput.value = settings.clientId;
-    if (!readyConfig()) {
-      status.textContent = 'Chưa cấu hình Google OAuth và Cloudflare Worker. Mở “Tự cấu hình” bên dưới để nhập hai địa chỉ công khai.';
-      document.getElementById('bb-selfconfig').open = true;
-      return;
-    }
-    try {
-      const res = await fetch(settings.apiBase + '/api/health', { mode: 'cors' });
-      if (!res.ok) throw new Error('Cloudflare Worker chưa sẵn sàng.');
-      const health = await res.json();
-      if (!health.ready) throw new Error('Worker chưa thiết lập các bí mật xác thực.');
-      apiReady = true;
-    } catch (e) {
-      showError('Không kết nối được Cloudflare Worker: ' + e.message);
-      return;
-    }
-    if (await restoreSession()) return;
-    for (let i = 0; i < 25 && !window.google?.accounts?.id; i++) {
-      await new Promise(resolve => setTimeout(resolve, 200));
-    }
-    login();
-  }
-  saveBtn.addEventListener('click', () => {
-    const url = apiInput.value.trim().replace(/\/+$/, '');
-    const cid = clientInput.value.trim();
-    const old = settings.apiBase;
-    if (old && url !== old &&
-      !confirm('Chỉ nhập Worker mà bạn tin cậy. Worker mới sẽ nhận thông tin thiết bị và yêu cầu xác thực Google. Tiếp tục?')) return;
-    localStorage.setItem(BASE, JSON.stringify({ workerUrl: url, googleClientId: cid }));
-    sessionStorage.removeItem(SESSION);
-    location.reload();
+  ui('bb-pair-start')?.addEventListener('click',startPair);
+  ui('bb-open-app')?.addEventListener('click',()=>document.body.classList.add('bilabot-open'));
+  ui('bb-return-home')?.addEventListener('click',()=>document.body.classList.remove('bilabot-open'));
+  ui('bb-save-config')?.addEventListener('click',()=>{
+    const url=ui('bb-api-input').value.trim().replace(/\/+$/,'');
+    const mode=ui('bb-relay-mode').value;
+    if(url&&url!==settings.workerUrl&&!confirm(
+      'Worker do bạn chọn sẽ nhận token thiết bị và âm thanh của bạn. Chỉ kết nối Worker mà bạn tin cậy. Tiếp tục?'))return;
+    localStorage.setItem(SAVE,JSON.stringify({workerUrl:url,mode}));
+    sessionStorage.removeItem(SESSION);location.reload();
   });
-  logout?.addEventListener('click', () => {
-    sessionStorage.removeItem(SESSION);
-    token = '';
-    window.google?.accounts?.id?.disableAutoSelect();
-    location.reload();
-  });
-  window.BilaBotAuth = {
-    get apiBase() { return settings.apiBase; },
-    get sessionToken() { return token && expiresAt > Date.now() + 10_000 ? token : ''; },
-    signOut() { logout?.click(); }
+  if(ui('bb-api-input'))ui('bb-api-input').value=settings.workerUrl;
+  if(ui('bb-relay-mode'))ui('bb-relay-mode').value=settings.mode;
+  if(settings.mode==='direct')setStatus('Chế độ trực tiếp: chỉ dùng với máy chủ cho phép CORS và không yêu cầu custom WebSocket headers.');
+  else if(!validBase())setStatus('Chủ website cần cấu hình Worker để kết nối máy chủ XiaoZhi chính thức. Bạn vẫn có thể mở giao diện BilaBot.');
+  else setStatus('Đăng nhập trên XiaoZhi, sau đó nhấn Tạo mã kích hoạt.');
+  window.BilaBotBridge={
+    get mode(){return settings.mode;},
+    get apiBase(){return settings.workerUrl;},
+    get sessionToken(){return transportSession&&expiresAt>Date.now()+10_000?transportSession:'';},
+    ensureSession, startPair, official
   };
-  boot();
 })();

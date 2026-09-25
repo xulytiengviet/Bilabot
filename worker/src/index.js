@@ -1,16 +1,13 @@
-/**
- * BilaBot Gateway — Cloudflare Worker for the GitHub Pages frontend.
- * MIT; derived protocol semantics from 78/xiaozhi-esp32 and Olivia AI.
- * This Worker NEVER asks for a XiaoZhi password or receives Google access
- * to Gmail/Drive. Google ID-token verification is against Google's JWKS.
+/** BilaBot relay for the official XiaoZhi DEVICE protocol.
+ * Google/XiaoZhi website authentication stays exclusively at xiaozhi.me.
+ * The relay issues a short transport session after Turnstile verification.
+ * No Google login, Google OAuth Client ID, or XiaoZhi cookie is handled here.
  */
-const GOOGLE_CERTS = 'https://www.googleapis.com/oauth2/v3/certs';
 const OTA_HOSTS = new Set(['api.tenclass.net', 'api.xiaozhi.me', 'xiaozhi.me', 'www.xiaozhi.me']);
 const WS_HOSTS = new Set(['api.tenclass.net', 'api.xiaozhi.me']);
 const VISION_HOSTS = new Set(['api.xiaozhi.me']);
 const MAX_JSON_BYTES = 32_768;
 const MAX_IMAGE_BYTES = 4 * 1024 * 1024;
-let jwksCache = { keys: [], until: 0 };
 
 const utf8 = new TextEncoder();
 const fromUTF8 = new TextDecoder();
@@ -29,10 +26,10 @@ function jsonB64(text) { return JSON.parse(fromUTF8.decode(fromB64url(text))); }
 function bad(status, message, headers) {
   return Response.json({ error: message }, { status, headers });
 }
-function configured(env) {
-  return Boolean(env.GOOGLE_CLIENT_ID && env.SESSION_SECRET &&
-    env.SESSION_SECRET.length >= 32 && /^[a-fA-F0-9]{64}$/.test(env.TICKET_KEY || '') &&
-    env.PAGE_ORIGIN);
+function configured(env){
+  return Boolean(env.TURNSTILE_SECRET && env.TURNSTILE_SITE_KEY &&
+    env.SESSION_SECRET?.length>=32 &&
+    /^[a-fA-F0-9]{64}$/.test(env.TICKET_KEY||'') && env.PAGE_ORIGIN);
 }
 function allowedOrigin(origin, env) {
   const list = String(env.PAGE_ORIGIN || 'https://xulytiengviet.github.io')
@@ -50,42 +47,25 @@ function cors(origin) {
     'X-Content-Type-Options': 'nosniff'
   };
 }
-async function getJwks() {
-  if (jwksCache.until > Date.now() && jwksCache.keys.length) return jwksCache.keys;
-  const r = await fetch(GOOGLE_CERTS);
-  if (!r.ok) throw new Error('Google verification unavailable');
-  const data = await r.json();
-  if (!Array.isArray(data.keys)) throw new Error('No Google verification keys');
-  const seconds = /max-age=(\d+)/.exec(r.headers.get('Cache-Control') || '');
-  jwksCache = { keys: data.keys, until: Date.now() + Math.min(3600, Number(seconds?.[1]) || 300) * 1000 };
-  return data.keys;
-}
-async function verifyGoogle(idToken, audience) {
-  if (typeof idToken !== 'string' || idToken.length > 8_192) throw new Error('Invalid Google credential');
-  const chunks = idToken.split('.');
-  if (chunks.length !== 3) throw new Error('Malformed Google credential');
-  const header = jsonB64(chunks[0]);
-  if (header.alg !== 'RS256' || !header.kid) throw new Error('Unexpected token algorithm');
-  const jwks = await getJwks();
-  const cert = jwks.find(k => k.kid === header.kid && k.kty === 'RSA');
-  if (!cert) throw new Error('Google signing key not found');
-  const key = await crypto.subtle.importKey('jwk', cert,
-    { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' }, false, ['verify']);
-  const ok = await crypto.subtle.verify('RSASSA-PKCS1-v1_5', key,
-    fromB64url(chunks[2]), utf8.encode(chunks[0] + '.' + chunks[1]));
-  if (!ok) throw new Error('Invalid Google signature');
-  const payload = jsonB64(chunks[1]);
-  const now = Math.floor(Date.now() / 1000);
-  if (payload.aud !== audience ||
-      !['https://accounts.google.com','accounts.google.com'].includes(payload.iss) ||
-      typeof payload.exp !== 'number' || payload.exp < now ||
-      (typeof payload.iat === 'number' && payload.iat > now + 120) ||
-      payload.email_verified !== true ||
-      typeof payload.sub !== 'string' || !payload.sub) {
-    throw new Error('Google account not verified for this application');
-  }
-  return { sub: payload.sub, email: payload.email || '',
-    name: payload.name || '', picture: payload.picture || '' };
+// Cloudflare Turnstile protects the public transport gateway against abuse;
+// this is NOT XiaoZhi login and does not authorize a console account.
+async function verifyTurnstile(token,request,env){
+  if(typeof token!=='string'||token.length<8||token.length>4096)
+    throw new Error('Invalid Turnstile token');
+  const params=new URLSearchParams({
+    secret:env.TURNSTILE_SECRET,
+    response:token,
+    remoteip:request.headers.get('CF-Connecting-IP')||''
+  });
+  const r=await fetch('https://challenges.cloudflare.com/turnstile/v0/siteverify',{
+    method:'POST',body:params
+  });
+  if(!r.ok)throw new Error('Turnstile verification unavailable');
+  const data=await r.json();
+  const domain=new URL(String(env.PAGE_ORIGIN).split(',')[0].trim()).hostname;
+  if(data.success!==true || data.hostname!==domain)
+    throw new Error('Invalid Turnstile challenge or hostname');
+  return true;
 }
 async function hmacKey(secret) {
   return crypto.subtle.importKey('raw', utf8.encode(secret),
@@ -100,7 +80,7 @@ async function makeSession(user, secret) {
 }
 async function authenticate(request, env) {
   const h = request.headers.get('Authorization') || '';
-  if (!h.startsWith('Bearer ')) throw new Error('Google login required');
+  if (!h.startsWith('Bearer ')) throw new Error('BilaBot transport session required');
   const pair = h.slice(7).split('.');
   if (pair.length !== 2) throw new Error('Invalid session');
   const key = await hmacKey(env.SESSION_SECRET);
@@ -239,25 +219,23 @@ export default {
     const headers = cors(origin);
     if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers });
     if (request.method === 'GET' && url.pathname === '/api/health') {
-      return Response.json({ ready: configured(env), version: 1 }, { headers });
+      return Response.json({ ready: configured(env), turnstileSiteKey: env.TURNSTILE_SITE_KEY||'', version: 2 }, { headers });
     }
     if (!configured(env)) return bad(503, 'Worker secrets not configured', headers);
     try {
-      if (request.method === 'POST' && url.pathname === '/api/auth/google') {
-        const body = await parseJson(request, 10_000);
-        const user = await verifyGoogle(body.credential, env.GOOGLE_CLIENT_ID);
-        const session = await makeSession(user, env.SESSION_SECRET);
-        return Response.json({ ...session, user: {
-          name: user.name, email: user.email, picture: user.picture
-        }}, { headers });
+      if(request.method==='POST' && url.pathname==='/api/auth/session'){
+        const body=await parseJson(request,8192);
+        await verifyTurnstile(body.turnstileToken,request,env);
+        const session=await makeSession({sub:'browser:'+crypto.randomUUID()},env.SESSION_SECRET);
+        return Response.json(session,{headers});
       }
-      if (request.method === 'GET' && url.pathname === '/api/ws') {
+            if (request.method === 'GET' && url.pathname === '/api/ws') {
         // Tickets are opaque AES-GCM messages valid for 60 s, not raw tokens in URLs.
         return await websocketRelay(request, env, ctx, headers);
       }
       const claims = await authenticate(request, env);
       if (request.method === 'GET' && url.pathname === '/api/me') {
-        return Response.json({ user: { name: 'Đã xác thực Google' }, sub: claims.sub }, { headers });
+        return Response.json({ transport: 'verified', expiresAt: claims.exp*1000 }, { headers });
       }
       if (request.method === 'POST' && url.pathname === '/api/ws-ticket') {
         const d = await parseJson(request);
@@ -309,7 +287,7 @@ export default {
       return bad(404, 'Route not found', headers);
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unexpected gateway error';
-      const clientError = /Invalid|Expired|login|session|required|not allowed|large|Unsupported|Malformed|verified|signature|algorithm/i.test(message);
+      const clientError = /Invalid|Expired|login|session|required|not allowed|large|Unsupported|Malformed|verified|signature|algorithm|Turnstile/i.test(message);
       return bad(clientError ? 400 : 502, message, headers);
     }
   }
