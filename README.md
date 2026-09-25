@@ -1,85 +1,57 @@
-# BilaBot — XiaoZhi Web AI (không đăng nhập Google riêng)
+# BilaBot · Trợ lý giọng nói XiaoZhi AI trên trình duyệt
 
 **Trang web:** https://xulytiengviet.github.io/Bilabot/  
-**Mã nguồn:** https://github.com/xulytiengviet/Bilabot  
-**Hướng dẫn:** [docs/SETUP.md](docs/SETUP.md) · [Worker](worker/README.md)
+**Hướng dẫn cấu hình:** [docs/SETUP.md](docs/SETUP.md)  
+**Worker:** [worker/README.md](worker/README.md)  
+**Quyền riêng tư:** [docs/privacy-policy.html](docs/privacy-policy.html)
 
-**Luồng chính xác:** Mở https://xiaozhi.me/console/agents và đăng nhập Google **tại XiaoZhi**, quay lại BilaBot, nhấn **Tạo mã kích hoạt**. BilaBot tạo danh tính ESP32 ảo và hiển thị **mã do XiaoZhi OTA thực sự cấp**, để bạn thêm thiết bị vào AI Agent của tài khoản XiaoZhi. Sau khi ghép nối, ứng dụng sử dụng micro/loa, Opus/WebSocket, STT/TTS và MCP.
+BilaBot có landing page tiếng Việt lấy cảm hứng thiết kế từ Olivia, cùng giao diện trò chuyện AI ESP32 ảo chạy trên Chrome, Edge và điện thoại. Dự án kế thừa kiến trúc [Olivia AI](https://github.com/roalfb/olivia-ai) (MIT), tương thích giao thức [XiaoZhi ESP32](https://github.com/78/xiaozhi-esp32) (MIT).
 
-**Giới hạn:** Browser trên GitHub Pages không thể dùng lại cookie đăng nhập Google từ xiaozhi.me hoặc tự tạo custom WebSocket headers. Để sử dụng XiaoZhi **chính thức**, chủ website phải triển khai Cloudflare Worker nhỏ (có Turnstile, không yêu cầu Google OAuth lần hai). Chế độ trình duyệt trực tiếp chỉ dành cho máy chủ tự quản có CORS và giao thức WS hỗ trợ browser. **Không có mã kích hoạt thật nếu thiếu kết nối OTA thành công.**
+## Cấu hình lần đầu: hai phiên Google độc lập
 
----
+1. **Google Identity Services cho BilaBot:** nếu chủ website đã thiết lập Client ID và Cloudflare Worker, nút Google GIS xác thực ID token tại Worker (chữ ký Google JWKS, aud, iss, exp) trước khi cấp relay session.
+2. **Đăng nhập XiaoZhi chính thức:** người dùng mở https://xiaozhi.me/console/agents và đăng nhập Google riêng tại đó. BilaBot không đọc cookie/phiên XiaoZhi, không chia sẻ mật khẩu và không đồng nhất hai phiên.
+3. **OTA tự động và mã kích hoạt thực:** sau khi Google được xác minh, BilaBot bắt đầu khởi tạo ESP32 ảo và gọi OTA XiaoZhi qua Worker (hoặc người dùng nhấn nút khởi tạo). Chỉ khi XiaoZhi trả mã, BilaBot mới hiển thị mã đó. Người dùng nhập mã tại bảng điều khiển XiaoZhi để liên kết AI Agent.
+4. **Kết nối giọng nói:** BilaBot tự kiểm tra trạng thái, nhận device token và WSS URL, truyền Opus hai chiều qua WebSocket, nhận STT/TTS và thực thi các MCP được cấp quyền.
 
-# BilaBot — XiaoZhi Web AI (thiết bị ESP32 ảo)
+**GitHub Pages là hosting tĩnh.** Kết nối XiaoZhi chính thức yêu cầu Cloudflare Worker nhỏ để giải quyết OTA CORS, kiểm tra Google GIS/Turnstile, bổ sung header HTTP mà WebSocket trình duyệt không hỗ trợ. Không có mã kích hoạt thực trước khi chủ ứng dụng cung cấp Google Web Client ID, Worker URL và cấu hình secret cần thiết. Tài liệu [SETUP](docs/SETUP.md) liệt kê toàn bộ cấu hình.
 
-Ứng dụng giọng nói tiếng Việt trên Chrome, Edge và điện thoại. BilaBot được phát triển dựa trên kiến trúc và mã nguồn [Olivia AI](https://github.com/roalfb/olivia-ai) (MIT), tương thích giao thức [XiaoZhi ESP32](https://github.com/78/xiaozhi-esp32) (MIT).
+## Chức năng
 
-**Tính năng:** ghép nối tài khoản tại [xiaozhi.me](https://xiaozhi.me/console/login?redirect=%2Fconsole%2F) bằng mã kích hoạt, kết nối WebSocket có xác thực, âm thanh Opus thật qua WASM, nhận dạng giọng nói (STT) và tổng hợp tiếng nói (TTS) qua XiaoZhi, MCP JSON-RPC 2.0, camera, nhiều trợ lý độc lập, nhật ký giao thức và giao diện PWA.
-
-> **Lưu ý quan trọng về SSO:** xiaozhi.me chưa công bố cơ chế OAuth/SSO dành cho trang web bên thứ ba trong tài liệu giao thức thiết bị. Đăng nhập tại trang chính thức không cho phép BilaBot đọc cookie hoặc lấy token đăng nhập của bạn. Ở lần đầu, bạn **đăng nhập xiaozhi.me và nhập mã kích hoạt thiết bị ảo** do BilaBot hiển thị. Những lần sau, BilaBot sử dụng định danh và token thiết bị đã ghép nối để kết nối lại. **Không nhập mật khẩu XiaoZhi vào BilaBot.**
-
-## Chạy thử
-
-Yêu cầu Node.js >= 20 và npm.
-
-```bash
-git clone https://github.com/xulytiengviet/Bilabot.git
-cd Bilabot
-npm install
-npm run dev
-```
-
-Mở địa chỉ localhost do Vite cung cấp; cho phép trình duyệt sử dụng micro/camera khi cần. Có thể dùng `npm run build && npm run preview` để thử cấu hình Cloudflare Pages.
-
-## Kết nối XiaoZhi
-
-1. Mở BilaBot, chọn **Đăng nhập XiaoZhi** để đăng nhập tại trang **chính thức**.
-2. Quay lại BilaBot, nhấn **Kết nối**. Nếu đây là thiết bị mới, BilaBot thực hiện OTA provisioning và hiển thị mã kích hoạt.
-3. Vào bảng điều khiển XiaoZhi, thêm/ghép nối thiết bị bằng mã hiển thị; chờ trạng thái **Đã kết nối**. Cấu hình AI Agent, giọng nói và mô hình trên trang chính thức.
-4. Cho phép micro, nhấn nút micro để trò chuyện. BilaBot chuyển âm thanh Opus qua WebSocket; STT/TTS và mô hình chạy ở dịch vụ XiaoZhi đã cấu hình.
-
-Không cần bo mạch ESP32, API key của LLM hoặc chia sẻ mật khẩu với BilaBot. Cần Internet khi trò chuyện với máy chủ chính thức.
+- Landing page và wizard tiếng Việt, nút Google GIS chính thức, trạng thái kết nối rõ ràng, giao diện responsive và dark visualizer.
+- Định danh ESP32 ảo bền vững theo trợ lý: Device-Id / Client-Id, OTA check / activate, mã kích hoạt được máy chủ cấp.
+- Giao diện đa trợ lý từ Olivia, mỗi trợ lý có hội thoại, avatar, âm lượng, mã ghép nối, token và WebSocket độc lập.
+- Opus WASM, Web Audio, micro và loa, chuyển phát STT/TTS do XiaoZhi xử lý.
+- MCP JSON-RPC 2.0 cho các công cụ mà ứng dụng và người dùng cho phép; ảnh/camera theo quyền.
+- Tab nhật ký kết nối hỗ trợ chẩn đoán OTA và WebSocket.
 
 ## Kiến trúc
 
-```text
-PWA trình duyệt (JS + Web Audio + Opus/WASM)
-  |  OTA/check, OTA/activate, WebSocket, vision
-  v
-Hono + Cloudflare Pages Functions (xác thực / proxy)
-  |  TLS/WSS: Activation-Version, Device-Id, Client-Id, Authorization
-  v
-XiaoZhi Cloud (AI Agent / STT / LLM / TTS / MCP)
-```
+    BilaBot GitHub Pages (docs/)      Google GIS
+       |                                   |
+       | ID token + Turnstile             `→ Google JWT`
+       v
+    Cloudflare Worker (worker/src/index.js)
+       ├── Google JWKS verification → relay session (1 giờ)
+       ├── POST /api/ota/check     → XiaoZhi OTA
+       ├── POST /api/ota/activate  → XiaoZhi OTA/activate
+       ├── POST /api/ws-ticket    → WSS ticket AES-GCM ngắn hạn
+       └── GET /api/ws            → XiaoZhi WSS (custom headers)
+                                            |
+                                            └── Opus, STT, TTS, MCP
 
-* `src/index.tsx`: backend Hono, các tuyến proxy OTA, WebSocket và camera.
-* `public/static/app.js`: đa trợ lý, OTA, nhận dạng tiếng nói từ máy chủ, âm thanh Opus, TTS streaming, MCP.
-* `public/static/style.css`: giao diện đáp ứng, chế độ sáng/tối.
-* `public/static/manifest.json`: cài ứng dụng PWA.
-* `vite.config.ts`: Vite, Hono dev server, Cloudflare build.
+Đăng nhập và ghép nối với tài khoản XiaoZhi được thực hiện **riêng tại xiaozhi.me**. BilaBot không có quyền tự thêm thiết bị vào tài khoản khi chưa có mã được người dùng nhập và XiaoZhi xác nhận.
 
-**Không thể dùng GitHub Pages thuần** với máy chủ chính thức khi phải gửi WebSocket handshake chứa các header tuỳ chỉnh. Nếu muốn sử dụng tên miền GitHub Pages, cần thêm proxy Cloudflare Worker ở miền do bạn kiểm soát. Bản này triển khai trọn bộ trên Cloudflare Pages.
+## Tự triển khai
 
-## Triển khai Cloudflare Pages
+- Khai báo Google OAuth **Web Client ID** với Authorized JavaScript Origin https://xulytiengviet.github.io, điền cùng Client ID vào docs/config.js và worker/wrangler.toml.
+- Triển khai Cloudflare Worker cùng TURNSTILE_SITE_KEY, TURNSTILE_SECRET, SESSION_SECRET, TICKET_KEY và PAGE_ORIGIN; điền Worker URL vào docs/config.js.
+- Bật GitHub Pages → GitHub Actions; workflow .github/workflows/pages.yml tự triển khai docs/.
 
-```bash
-npm ci
-npm run build
-npx wrangler login
-npm run deploy
-```
+Kiểm tra cú pháp: node --check docs/auth.js && node --check worker/src/index.js.
 
-Bạn cũng có thể kết nối GitHub repository với Cloudflare Pages, cấu hình lệnh build `npm run build`, thư mục đầu ra `dist` và runtime tương thích Worker. Hãy bật HTTPS trên tên miền triển khai.
+**Giới hạn:** không thể kết nối thẳng server XiaoZhi chính thức qua JS WebSocket thuần nếu cần các header ESP32. Google đăng nhập tại BilaBot không phải SSO vào XiaoZhi. Opus và các mô hình STT/TTS phía XiaoZhi cần Internet khi trò chuyện.
 
-## Bảo mật và giới hạn
+## Giấy phép và ghi nhận
 
-* Proxy chỉ chuyển tiếp tới các máy chủ XiaoZhi được cho phép; không chia sẻ token và không công khai khoá trong mã nguồn.
-* Token thiết bị được lưu cục bộ trên trình duyệt của bạn như bản Olivia gốc. Không sử dụng trên máy tính công cộng; xóa dữ liệu trang khi cần hủy ghép nối. Nên dùng tên miền riêng và HTTPS khi triển khai thực tế.
-* Browser WebSocket API không cho phép tự đặt `Authorization`, `Device-Id` và `Client-Id`; Hono đóng vai trò proxy. Khả năng kết nối phụ thuộc máy chủ XiaoZhi chấp nhận thiết bị ảo, trạng thái kích hoạt, cấu hình mô hình và quyền tài khoản.
-* Tính năng MCP chỉ hoạt động với các công cụ mà bản web đăng ký và người dùng cho phép; **không cấp quyền tùy ý truy cập tập tin hay điều khiển toàn bộ máy tính**.
-* Opus WASM được tải từ CDN bên thứ ba khi dùng lần đầu; trò chuyện trực tuyến, không bảo đảm hoạt động ngoại tuyến.
-* Không tuyên bố có đăng nhập SSO một cú nhấp cho trang bên thứ ba nếu phía XiaoZhi chưa cung cấp OAuth chính thức.
-
-## Ghi nhận tác giả và giấy phép
-
-BilaBot (2026) — Long Ngo / xulytiengviet. Phần ứng dụng phái sinh và cấu trúc giao thức kế thừa [Olivia AI](https://github.com/roalfb/olivia-ai), bản quyền © 2025 Olivia Contributors, **MIT License**. Giao thức và ý tưởng firmware tham khảo [78/xiaozhi-esp32](https://github.com/78/xiaozhi-esp32), MIT. Dự án độc lập, không phải sản phẩm chính thức hoặc được XiaoZhi bảo trợ. Xem [LICENSE](LICENSE).
+BilaBot (2026) — Long Ngo / xulytiengviet. Các phần nguồn dựa trên [Olivia AI](https://github.com/roalfb/olivia-ai) thuộc giấy phép MIT; tham khảo [78/xiaozhi-esp32](https://github.com/78/xiaozhi-esp32), MIT. Dự án độc lập, không đại diện cho hoặc được Google/XiaoZhi bảo trợ. Xem [LICENSE](LICENSE).
