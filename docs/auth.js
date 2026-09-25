@@ -62,6 +62,8 @@
     if (!data.ready || !data.turnstileSiteKey) throw new Error('Worker chưa thiết lập đủ Turnstile và khóa bí mật.');
     if (settings.googleClientId && !data.googleConfigured)
       throw new Error('Worker chưa khai báo GOOGLE_CLIENT_ID tương ứng với BilaBot.');
+    if (!settings.googleClientId && data.googleConfigured)
+      throw new Error('Worker yêu cầu Google nhưng landing chưa khai báo googleClientId trong docs/config.js.');
     healthCache = data;
     return data;
   }
@@ -200,7 +202,7 @@
     if (!settings.googleClientId) {
       if (wrap) wrap.hidden = true;
       if (placeholder) placeholder.hidden = false;
-      return;
+      return true; // Absence of configuration is not a Google CDN loading failure.
     }
     if (placeholder) placeholder.hidden = true;
     if (!window.google?.accounts?.id) return false;
@@ -247,8 +249,10 @@
     }
     try {
       const previous = JSON.parse(sessionStorage.getItem(SESSION) || 'null');
-      if (previous?.workerUrl === settings.workerUrl && previous.expiresAt > Date.now() + 20_000 && previous.profile)
-        showProfile(previous.profile);
+      if (previous?.workerUrl === settings.workerUrl && previous.expiresAt > Date.now() + 20_000 && previous.profile && validBase()) {
+        // Validate the stored relay session server-side before displaying a verified profile.
+        ensureSession().catch(() => { sessionStorage.removeItem(SESSION); showProfile(null); });
+      }
     } catch {}
     if (settings.mode === 'direct')
       status('Chế độ trực tiếp chỉ dành cho máy chủ tự quản hỗ trợ CORS và WebSocket của trình duyệt.', 'idle');
