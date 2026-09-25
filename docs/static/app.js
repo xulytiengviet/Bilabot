@@ -6445,14 +6445,26 @@ const AppController = (() => {
 // ================================================================
 // APPLICATION ENTRY POINT
 // ================================================================
-document.addEventListener('DOMContentLoaded', () => {
-  // Small delay to let CSS animations settle
+// The landing's one-click OTA flow must not race the assistant store boot.
+window.BilaBotAppReady = false;
+function bootBilaBotApp() {
   setTimeout(() => {
-    AppController.init().catch(err => {
+    AppController.init().then(() => {
+      window.BilaBotAppReady = true;
+      window.dispatchEvent(new CustomEvent('bilabot:app-ready'));
+    }).catch(err => {
       console.error('[BOOT] Critical initialization error:', err);
+      window.dispatchEvent(new CustomEvent('bilabot:app-error', {
+        detail: { message: err?.message || 'Không khởi tạo được giao diện BilaBot.' }
+      }));
     });
   }, 100);
-});
+}
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', bootBilaBotApp, { once: true });
+} else {
+  bootBilaBotApp();
+}
 
 // Handle page unload - clean disconnect
 // PHASE 2 CHANGE: disconnect EVERY assistant's live session on unload,
