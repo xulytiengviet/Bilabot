@@ -28,6 +28,7 @@
 <link rel="stylesheet" href="./landing.css?v=studio4"/>
 <link rel="stylesheet" href="./olivia-theme.css?v=studio4"/>
 <link rel="stylesheet" href="./direct-setup.css?v=direct1"/>
+<link rel="stylesheet" href="./monochrome-dashboard.css?v=mono1"/>
 <script src="./deploy.js?v=studio4"></script>
 <script src="./config.js?v=studio4"></script>
 <script src="https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit" async defer></script>
@@ -310,15 +311,41 @@
        assistant, active or not). UIController tracks which assistant id
        the panel currently targets and reads/writes THAT assistant's
        fields, never assuming "the active one". See app.js openSettingsFor(). -->
-  <div class="settings-panel" id="settingsPanel">
-    <div class="settings-header">
-      <h2><i class="fas fa-cog"></i> Cài đặt trợ lý</h2>
-      <button class="close-settings-btn" id="closeSettingsBtn"><i class="fas fa-times"></i></button>
+  <div class="settings-panel bb-mono-dashboard" id="settingsPanel" data-pane="overview" role="dialog" aria-modal="true" aria-labelledby="bb-dashboard-title">
+    <div class="settings-header bb-dashboard-header">
+      <div class="bb-db-brand"><span class="bb-db-mark" aria-hidden="true">B</span><span><small>BILABOT / TRUNG TÂM ĐIỀU KHIỂN</small><h2 id="bb-dashboard-title">Bảng điều khiển cài đặt</h2></span></div>
+      <div class="bb-db-header-right"><span id="bb-db-top-state" role="status">Chưa kết nối</span><button class="close-settings-btn" id="closeSettingsBtn" type="button" aria-label="Đóng cài đặt"><i class="fas fa-xmark" aria-hidden="true"></i></button></div>
     </div>
-    <div class="settings-body">
+    <nav class="bb-db-nav" aria-label="Danh mục cài đặt">
+      <span class="bb-db-nav-heading">BẢNG ĐIỀU KHIỂN</span>
+      <button type="button" class="bb-db-tab active" data-pane="overview" aria-current="page"><i class="fas fa-border-all" aria-hidden="true"></i> Tổng quan</button>
+      <button type="button" class="bb-db-tab" data-pane="assistant"><i class="fas fa-robot" aria-hidden="true"></i> Trợ lý AI</button>
+      <button type="button" class="bb-db-tab" data-pane="connection"><i class="fas fa-link" aria-hidden="true"></i> Kết nối XiaoZhi</button>
+      <button type="button" class="bb-db-tab" data-pane="device"><i class="fas fa-microchip" aria-hidden="true"></i> Thiết bị ảo</button>
+      <button type="button" class="bb-db-tab" data-pane="protocol"><i class="fas fa-wave-square" aria-hidden="true"></i> Giao thức</button>
+      <button type="button" class="bb-db-tab" data-pane="audio"><i class="fas fa-microphone-lines" aria-hidden="true"></i> Giọng nói</button>
+      <span class="bb-db-nav-heading bb-db-nav-secondary">DỮ LIỆU</span>
+      <button type="button" class="bb-db-tab" data-pane="data"><i class="fas fa-hard-drive" aria-hidden="true"></i> Sao lưu &amp; dữ liệu</button>
+      <div class="bb-db-nav-bottom">Cấu hình lưu trên trình duyệt</div>
+    </nav>
+    <div class="settings-body bb-db-body" id="bb-db-body">
+      <section class="bb-dash-pane" data-pane="overview" id="bb-dash-overview">
+        <span class="bb-db-eyebrow">TỔNG QUAN</span><h3>Trung tâm điều khiển BilaBot</h3>
+        <p class="bb-db-intro">Quản lý trợ lý AI, ghép nối XiaoZhi và thiết bị ESP32 ảo trên cùng một bảng điều khiển đơn sắc.</p>
+        <div class="bb-db-metrics">
+          <article><small>TRỢ LÝ HIỆN TẠI</small><strong id="bb-db-assistant-name">BilaBot</strong><span id="bb-db-assistant-count">Đang tải</span></article>
+          <article><small>GHÉP NỐI</small><strong id="bb-db-pairing">Chưa ghép nối</strong><span id="bb-db-connection">Chưa kết nối WebSocket</span></article>
+          <article><small>GATEWAY</small><strong id="bb-db-gateway">Chưa kiểm tra</strong><span id="bb-db-gateway-url">Chưa có địa chỉ gateway</span></article>
+        </div>
+        <div class="bb-db-card"><div class="bb-db-card-head"><div><small>THIẾT LẬP NHANH</small><h4>Kết nối với XiaoZhi</h4></div><i class="fas fa-arrow-up-right-dots" aria-hidden="true"></i></div>
+          <p>Nhận mã kích hoạt thật từ XiaoZhi và nhập vào mục thêm thiết bị trên trang chính thức. BilaBot tự xác nhận khi kết nối hoàn tất.</p>
+          <div class="bb-db-actions"><button type="button" class="bb-db-primary" id="bb-db-quick-ota"><i class="fas fa-key" aria-hidden="true"></i> Lấy mã OTA</button><button type="button" class="bb-db-secondary" data-go-pane="connection">Cài đặt kết nối</button><a class="bb-db-secondary" href="https://xiaozhi.me/console/agents" target="_blank" rel="noopener noreferrer">Mở XiaoZhi.me ↗</a></div>
+        </div>
+        <div class="bb-db-card bb-db-sysinfo"><h4>Thông tin hệ thống</h4><div><span>Ứng dụng</span><strong>BilaBot · Trợ lý giọng nói tiếng Việt</strong></div><div><span>Giao thức</span><strong>WebSocket · Opus · OTA</strong></div><div><span>Nguồn mở</span><strong>Olivia AI · Giấy phép MIT</strong></div></div>
+      </section>
 
-      <div class="settings-section">
-        <h3>Trợ lý</h3>
+      <div class="settings-section bb-dash-pane" data-pane="assistant" id="bb-dash-assistant">
+        <span class="bb-db-eyebrow">CÀI ĐẶT / ASSISTANT</span><h3>Trợ lý</h3>
         <div class="form-group">
           <label for="assistantNameInput">Tên trợ lý</label>
           <input type="text" id="assistantNameInput" placeholder="Trợ lý của tôi" />
@@ -362,8 +389,16 @@
         </div>
       </div>
 
-      <div class="settings-section">
-        <h3>Kết nối</h3>
+      <div class="settings-section bb-dash-pane" data-pane="connection" id="bb-dash-connection">
+        <span class="bb-db-eyebrow">CÀI ĐẶT / KẾT NỐI</span><h3>Kết nối XiaoZhi</h3><p class="bb-db-intro">Thiết lập gateway Cloudflare Pages, OTA và WebSocket cho thiết bị ảo.</p>
+        <div class="bb-db-card bb-db-gateway-form"><div class="bb-db-card-head"><div><small>01 / GATEWAY</small><h4>Máy chủ trung gian</h4></div><span id="bb-db-gateway-indicator">Chưa kiểm tra</span></div>
+          <label for="bb-db-proxy-url">Địa chỉ Cloudflare Pages</label><input id="bb-db-proxy-url" type="url" spellcheck="false" autocomplete="off" placeholder="https://ten-du-an.pages.dev"/>
+          <small>GitHub Pages chỉ chạy giao diện. Để lấy mã OTA thật, cần gateway HTTPS đã triển khai.</small>
+          <label for="bb-db-mode">Chế độ kết nối</label><select id="bb-db-mode"><option value="gateway">Gateway Hono · XiaoZhi chính thức</option><option value="direct">Máy chủ tự quản hỗ trợ CORS</option></select>
+          <div class="bb-db-actions"><button type="button" id="bb-db-check-gateway" class="bb-db-secondary">Kiểm tra kết nối</button><button type="button" id="bb-db-save-gateway" class="bb-db-primary">Lưu và tải lại</button></div>
+          <p class="bb-db-inline-status" id="bb-db-gateway-message" role="status" aria-live="polite">Chưa kiểm tra gateway.</p>
+        </div>
+        <div class="bb-db-card"><div class="bb-db-card-head"><div><small>02 / OTA</small><h4>Kích hoạt thiết bị</h4></div></div><p>Nhận mã từ XiaoZhi và theo dõi trạng thái ghép nối ngay trong BilaBot.</p><button type="button" class="bb-db-primary" id="bb-db-open-pairing"><i class="fas fa-key" aria-hidden="true"></i> Lấy mã / Ghép nối</button></div>
         <div class="form-group">
           <label for="wsUrlInput">WebSocket URL</label>
           <input type="text" id="wsUrlInput" placeholder="wss://api.xiaozhi.me/xiaozhi/v1/"
@@ -388,8 +423,8 @@
         </div>
       </div>
 
-      <div class="settings-section">
-        <h3>Virtual Device Identity</h3>
+      <div class="settings-section bb-dash-pane" data-pane="device" id="bb-dash-device">
+        <span class="bb-db-eyebrow">CÀI ĐẶT / DEVICE</span><h3>Virtual Device Identity</h3>
         <!-- PHASE 4: Device Name field removed from UI per spec.
              The device name is always "BilaBot" from the user's perspective.
              The internal field still exists in AssistantManager for protocol use. -->
@@ -406,8 +441,8 @@
         </div>
       </div>
 
-      <div class="settings-section">
-        <h3>Protocol Settings</h3>
+      <div class="settings-section bb-dash-pane" data-pane="protocol" id="bb-dash-protocol">
+        <span class="bb-db-eyebrow">CÀI ĐẶT / PROTOCOL</span><h3>Protocol Settings</h3>
         <div class="form-group">
           <label for="protocolVersionInput">Protocol Version</label>
           <select id="protocolVersionInput">
@@ -434,8 +469,8 @@
         </div>
       </div>
 
-      <div class="settings-section">
-        <h3>Audio</h3>
+      <div class="settings-section bb-dash-pane" data-pane="audio" id="bb-dash-audio">
+        <span class="bb-db-eyebrow">CÀI ĐẶT / AUDIO</span><h3>Audio</h3>
         <div class="form-group checkbox-group">
           <label>
             <input type="checkbox" id="audioEnabled" checked />
@@ -450,7 +485,14 @@
         </div>
       </div>
 
-      <div class="settings-actions">
+      <section class="bb-dash-pane" data-pane="data" id="bb-dash-data">
+        <span class="bb-db-eyebrow">DỮ LIỆU / BẢO MẬT</span><h3>Sao lưu &amp; dữ liệu</h3>
+        <p class="bb-db-intro">Xuất hoặc nhập bản sao lưu dữ liệu trợ lý. Thao tác nhập có thể thay thế thông tin đang lưu trên trình duyệt.</p>
+        <div class="bb-db-card" id="bb-db-backup-slot"></div>
+        <div class="bb-db-card"><h4>Quyền riêng tư</h4><p>Chỉ sử dụng gateway bạn tin cậy, vì gateway có thể xử lý token thiết bị và âm thanh. Không nhập mật khẩu XiaoZhi vào BilaBot.</p><a class="bb-db-secondary" href="./privacy-policy.html" target="_blank" rel="noopener noreferrer">Chính sách quyền riêng tư ↗</a></div>
+      </section>
+      <div class="settings-actions bb-db-save-actions">
+        <span class="bb-db-validation" id="bb-db-validation" role="alert" hidden></span>
         <button class="btn-primary" id="saveSettingsBtn">
           <i class="fas fa-save"></i> Save Settings
         </button>
@@ -830,6 +872,7 @@
 <!-- Our JS modules (loaded as module scripts) -->
 <script src="./auth.js?v=direct1"></script>
 <script src="./direct-setup.js?v=direct1"></script>
+<script src="./monochrome-dashboard.js?v=mono1"></script>
 <script type="module" src="./static/app.js?v=direct1"></script>
 
 </body>
