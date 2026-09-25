@@ -43,7 +43,7 @@
     let res;
     try{
       res=await fetch(settings.workerUrl+'/api/health',{mode:'cors',cache:'no-store',
-        signal:typeof AbortSignal?.timeout==='function'?AbortSignal.timeout(12000):undefined});
+        signal:typeof AbortSignal!=='undefined'&&typeof AbortSignal.timeout==='function'?AbortSignal.timeout(12000):undefined});
     }catch{
       setGatewayStatus('error','Không truy cập được gateway');
       throw new Error('Không kết nối được Cloudflare gateway. Kiểm tra URL, CORS và trạng thái triển khai.');
@@ -164,7 +164,7 @@
       pairProgress('connected','Đã kết nối XiaoZhi. Đang mở giao diện BilaBot…');
       if(ui('bb-code-hint'))ui('bb-code-hint').textContent='Thiết bị đã hoạt động. Nhấn micro để cấp quyền và bắt đầu trò chuyện.';
       if(ui('bb-pair-start'))ui('bb-pair-start').disabled=false;
-      setTimeout(()=>document.body.classList.add('bilabot-open'),700);
+      setTimeout(()=>{if(currentPhase==='connected')document.body.classList.add('bilabot-open');},700);
     }else if(phase==='disconnected'){
       if(currentPhase==='connected'){
         pairProgress('disconnected','WebSocket đã ngắt; mở trò chuyện và nhấn Kết nối để thử lại.');
