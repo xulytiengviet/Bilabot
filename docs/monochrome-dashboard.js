@@ -36,6 +36,15 @@
       return u.protocol==='https:'||u.protocol==='http:'&&['localhost','127.0.0.1'].includes(u.hostname);
     }catch{return false;}
   }
+  function gatewayOrigin(url){
+    if(!safeHost(url))return '';
+    try{
+      const u=new URL(url);
+      // Gateway is an origin, not a URL with credentials, query or a path.
+      if(u.username||u.password||u.search||u.hash||u.pathname!=='/')return '';
+      return u.origin;
+    }catch{return '';}
+  }
   function gatewayUrl(){
     const u=String(settings()?.bridge?.apiBase||window.BilaBotBridge?.apiBase||'').trim();
     return u;
@@ -86,8 +95,8 @@
       setGatewayState('idle','Chế độ trực tiếp: chỉ kiểm tra được bằng kết nối tới máy chủ tự quản tương thích.');
       return;
     }
-    if(!safeHost(url)){
-      setGatewayState('error','Vui lòng nhập URL HTTPS hợp lệ của Cloudflare Pages.');
+    if(!gatewayOrigin(url)){
+      setGatewayState('error','Nhập địa chỉ HTTPS dạng https://ten-du-an.pages.dev, không kèm đường dẫn hoặc thông tin đăng nhập.');
       return;
     }
     const request=++gatewayRequest;
@@ -118,11 +127,11 @@
       setGatewayState('idle','Gateway tích hợp cùng tên miền Cloudflare Pages; không cần thay đổi URL.');
       return;
     }
-    if(mode==='gateway'&&!safeHost(url)){
-      setGatewayState('error','Nhập địa chỉ gateway HTTPS hợp lệ trước khi lưu.');
+    if(mode==='gateway'&&!gatewayOrigin(url)){
+      setGatewayState('error','Nhập tên miền gateway HTTPS hợp lệ, không kèm đường dẫn hoặc thông tin đăng nhập.');
       return;
     }
-    if(mode==='direct'&&url&&!safeHost(url)){
+    if(mode==='direct'&&url&&!gatewayOrigin(url)){
       setGatewayState('error','Máy chủ tự quản phải sử dụng HTTPS hoặc HTTP trên localhost.');
       return;
     }
