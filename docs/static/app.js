@@ -1023,7 +1023,7 @@ const AssistantManager = (() => {
       paired: false,
     },
     device: {
-      deviceName: 'My Virtual ESP32',
+      deviceName: 'BilaBot',
       deviceId:   '', // Auto-generated on first use
       clientId:   '', // Auto-generated UUID on first use
     },
@@ -5067,7 +5067,7 @@ const UIController = (() => {
       const otaUrl = el('otaUrlInput').value.trim();
       if (otaUrl) AssistantManager.setFlatField(id, 'otaUrl', otaUrl);
     }
-    // PHASE 4: Device Name is always O.L.I.V.I.A. — not user-editable
+    // Device name is always BilaBot (virtual ESP32 identity).
     AssistantManager.setFlatField(id, 'deviceName', 'BilaBot');
     AssistantManager.setFlatField(id, 'protocolVersion', parseInt(el('protocolVersionInput').value) || 1);
     AssistantManager.setFlatField(id, 'frameDuration',   parseInt(el('frameDurationInput').value) || 60);
@@ -5392,7 +5392,7 @@ const UIController = (() => {
     container.innerHTML = `
       <div class="system-message" id="welcomeMsg">
         <span class="olivia-monogram olivia-monogram-inline" role="img" aria-label="BilaBot"></span>
-        <span>BilaBot initialized. Click Connect to register and pair via xiaozhi.me.</span>
+        <span>BilaBot đã sẵn sàng. Nhấn Kết nối để tạo thiết bị và ghép nối qua XiaoZhi.</span>
       </div>
     `;
   }
