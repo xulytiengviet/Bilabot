@@ -5,6 +5,8 @@ on:
     branches: [main]
     paths:
       - "docs/**"
+      - "worker/src/**"
+      - "worker/tests/**"
       - ".github/workflows/pages.yml"
   workflow_dispatch:
 
@@ -31,6 +33,7 @@ jobs:
           node --check docs/config.js
           node --check docs/static/app.js
           node --check worker/src/index.js
+          node --test worker/tests/*.test.mjs
           test -f docs/index.html
           test -f docs/.nojekyll
       - uses: actions/configure-pages@v5
