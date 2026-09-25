@@ -296,9 +296,9 @@
       <p class="import-confirm-message">Nhập bản sao lưu sẽ thay thế dữ liệu BilaBot hiện tại; không thể hoàn tác.</p>
       <div class="import-confirm-meta" id="importConfirmMeta"></div>
       <div class="import-confirm-actions">
-        <button class="btn-secondary" type="button" id="importCancelBtn">Cancel</button>
+        <button class="btn-secondary" type="button" id="importCancelBtn">Hủy</button>
         <button class="btn-primary" type="button" id="importConfirmBtn">
-          <i class="fas fa-check"></i> Import
+          <i class="fas fa-check"></i> Nhập dữ liệu
         </button>
       </div>
     </div>
@@ -345,47 +345,47 @@
       </section>
 
       <div class="settings-section bb-dash-pane" data-pane="assistant" id="bb-dash-assistant">
-        <span class="bb-db-eyebrow">CÀI ĐẶT / ASSISTANT</span><h3>Trợ lý</h3>
+        <span class="bb-db-eyebrow">CÀI ĐẶT / TRỢ LÝ</span><h3>Trợ lý AI</h3>
         <div class="form-group">
           <label for="assistantNameInput">Tên trợ lý</label>
           <input type="text" id="assistantNameInput" placeholder="Trợ lý của tôi" />
-          <small>Shown in the AI Assistants sidebar list and chat header</small>
+          <small>Tên xuất hiện trong danh sách trợ lý và tiêu đề hội thoại.</small>
         </div>
         <!-- PHASE 4: Avatar management inside settings -->
         <div class="form-group">
           <label>Ảnh đại diện</label>
           <div class="settings-avatar-section">
             <div class="settings-avatar-preview" id="settingsAvatarPreview">
-              <img class="assistant-avatar-img" id="settingsAvatarImg" src="./static/olivia-avatar-default.svg" alt="Assistant Avatar" />
+              <img class="assistant-avatar-img" id="settingsAvatarImg" src="./static/olivia-avatar-default.svg" alt="Ảnh đại diện trợ lý" />
             </div>
             <div class="settings-avatar-actions">
               <button class="btn-secondary" type="button" id="settingsUploadAvatarBtn">
                 <i class="fas fa-upload"></i> Tải ảnh mới
               </button>
               <button class="btn-secondary btn-small-danger" type="button" id="settingsRemoveAvatarBtn">
-                <i class="fas fa-trash"></i> Remove
+                <i class="fas fa-trash"></i> Xóa ảnh
               </button>
             </div>
           </div>
-          <small>PNG, JPG, JPEG, WEBP &mdash; auto-resized to 256&times;256</small>
+          <small>PNG, JPG, JPEG hoặc WEBP; ảnh được tự điều chỉnh về 256 × 256.</small>
         </div>
         <div class="form-group">
           <label>Trạng thái kết nối</label>
-          <div class="pairing-status-display" id="assistantConnectionStatusDisplay">Disconnected</div>
+          <div class="pairing-status-display" id="assistantConnectionStatusDisplay">Chưa kết nối</div>
         </div>
         <div class="form-group settings-connection-actions">
           <button class="btn-secondary" type="button" id="settingsReconnectBtn">
             <i class="fas fa-plug"></i> Kết nối / Kết nối lại
           </button>
           <button class="btn-secondary" type="button" id="settingsDisconnectBtn">
-            <i class="fas fa-plug-circle-xmark"></i> Disconnect
+            <i class="fas fa-plug-circle-xmark"></i> Ngắt kết nối
           </button>
         </div>
         <div class="form-group">
           <button class="btn-danger btn-block" type="button" id="deleteAssistantBtn">
             <i class="fas fa-trash"></i> Xóa trợ lý
           </button>
-          <small>Cannot delete the last remaining assistant</small>
+          <small>Không thể xóa trợ lý cuối cùng.</small>
         </div>
       </div>
 
@@ -403,84 +403,84 @@
           <label for="wsUrlInput">WebSocket URL</label>
           <input type="text" id="wsUrlInput" placeholder="wss://api.xiaozhi.me/xiaozhi/v1/"
                  value="wss://api.xiaozhi.me/xiaozhi/v1/" />
-          <small>Official server: wss://api.xiaozhi.me/xiaozhi/v1/</small>
+          <small>Địa chỉ WebSocket chính thức của XiaoZhi.</small>
         </div>
         <div class="form-group">
           <label for="otaUrlInput">OTA / Provisioning URL</label>
           <input type="text" id="otaUrlInput" placeholder="https://api.tenclass.net/xiaozhi/ota/"
                  value="https://api.tenclass.net/xiaozhi/ota/" />
-          <small>Device registration endpoint (same as ESP32 firmware)</small>
+          <small>Địa chỉ đăng ký thiết bị, tương tự firmware ESP32.</small>
         </div>
         <div class="form-group">
           <label>Trạng thái ghép nối</label>
           <div class="pairing-status-display" id="pairingStatusDisplay">Chưa ghép nối</div>
-          <small>Devices pair automatically via 6-digit code at xiaozhi.me</small>
+          <small>Nhập mã kích hoạt tại XiaoZhi.me để ghép nối thiết bị.</small>
         </div>
         <div class="form-group">
           <button class="btn-secondary btn-block" type="button" id="resetPairingBtn">
-            <i class="fas fa-unlink"></i> Reset Pairing
+            <i class="fas fa-unlink"></i> Xóa ghép nối
           </button>
         </div>
       </div>
 
       <div class="settings-section bb-dash-pane" data-pane="device" id="bb-dash-device">
-        <span class="bb-db-eyebrow">CÀI ĐẶT / DEVICE</span><h3>Virtual Device Identity</h3>
+        <span class="bb-db-eyebrow">CÀI ĐẶT / THIẾT BỊ</span><h3>Định danh thiết bị ảo</h3>
         <!-- PHASE 4: Device Name field removed from UI per spec.
              The device name is always "BilaBot" from the user's perspective.
              The internal field still exists in AssistantManager for protocol use. -->
         <input type="hidden" id="deviceNameInput" value="BilaBot" />
         <div class="form-group">
-          <label for="deviceIdInput">Device-Id (MAC Address)</label>
-          <input type="text" id="deviceIdInput" placeholder="Auto-generated" />
-          <small>Leave blank to auto-generate persistent MAC-style ID</small>
+          <label for="deviceIdInput">Mã thiết bị (địa chỉ MAC)</label>
+          <input type="text" id="deviceIdInput" placeholder="Tạo tự động" />
+          <small>Để trống để BilaBot tự tạo và lưu địa chỉ MAC cố định.</small>
         </div>
         <div class="form-group">
-          <label for="clientIdInput">Client-Id (UUID)</label>
-          <input type="text" id="clientIdInput" placeholder="Auto-generated UUID" />
-          <small>Leave blank to auto-generate persistent UUID</small>
+          <label for="clientIdInput">Mã ứng dụng (UUID)</label>
+          <input type="text" id="clientIdInput" placeholder="UUID tạo tự động" />
+          <small>Để trống để BilaBot tự tạo UUID cố định.</small>
         </div>
       </div>
 
       <div class="settings-section bb-dash-pane" data-pane="protocol" id="bb-dash-protocol">
-        <span class="bb-db-eyebrow">CÀI ĐẶT / PROTOCOL</span><h3>Protocol Settings</h3>
+        <span class="bb-db-eyebrow">CÀI ĐẶT / GIAO THỨC</span><h3>Cài đặt giao thức</h3>
         <div class="form-group">
-          <label for="protocolVersionInput">Protocol Version</label>
+          <label for="protocolVersionInput">Phiên bản giao thức</label>
           <select id="protocolVersionInput">
-            <option value="1" selected>Version 1 (Raw Opus)</option>
-            <option value="2">Version 2 (Timestamped)</option>
-            <option value="3">Version 3 (Lightweight Header)</option>
+            <option value="1" selected>Phiên bản 1 (Opus gốc)</option>
+            <option value="2">Phiên bản 2 (có dấu thời gian)</option>
+            <option value="3">Phiên bản 3 (header rút gọn)</option>
           </select>
         </div>
         <div class="form-group">
-          <label for="frameDurationInput">Frame Duration (ms)</label>
+          <label for="frameDurationInput">Thời lượng khung âm thanh (ms)</label>
           <select id="frameDurationInput">
-            <option value="20">20ms (Low Latency)</option>
-            <option value="40">40ms</option>
-            <option value="60" selected>60ms (Standard)</option>
+            <option value="20">20 ms (độ trễ thấp)</option>
+            <option value="40">40 ms</option>
+            <option value="60" selected>60 ms (tiêu chuẩn)</option>
           </select>
         </div>
         <div class="form-group">
-          <label for="listeningModeInput">Listening Mode</label>
+          <label for="listeningModeInput">Chế độ lắng nghe</label>
           <select id="listeningModeInput">
-            <option value="auto" selected>Auto (VAD stop)</option>
-            <option value="manual">Manual</option>
-            <option value="realtime">Realtime</option>
+            <option value="auto" selected>Tự động (phát hiện ngừng nói)</option>
+            <option value="manual">Thủ công</option>
+            <option value="realtime">Thời gian thực</option>
           </select>
         </div>
       </div>
 
       <div class="settings-section bb-dash-pane" data-pane="audio" id="bb-dash-audio">
-        <span class="bb-db-eyebrow">CÀI ĐẶT / AUDIO</span><h3>Audio</h3>
+        <span class="bb-db-eyebrow">CÀI ĐẶT / GIỌNG NÓI</span><h3>Giọng nói</h3>
         <div class="form-group checkbox-group">
           <label>
             <input type="checkbox" id="audioEnabled" checked />
-            <span>Enable Microphone (voice mode)</span>
+            <span>Bật micro để trò chuyện bằng giọng nói</span>
           </label>
         </div>
         <div class="form-group checkbox-group">
           <label>
             <input type="checkbox" id="ttsPlayback" checked />
-            <span>Play TTS audio from server</span>
+            <span>Phát giọng nói TTS từ máy chủ</span>
           </label>
         </div>
       </div>
@@ -494,10 +494,10 @@
       <div class="settings-actions bb-db-save-actions">
         <span class="bb-db-validation" id="bb-db-validation" role="alert" hidden></span>
         <button class="btn-primary" id="saveSettingsBtn">
-          <i class="fas fa-save"></i> Save Settings
+          <i class="fas fa-save"></i> Lưu cài đặt
         </button>
         <button class="btn-secondary" id="resetSettingsBtn">
-          <i class="fas fa-rotate-left"></i> Reset to Defaults
+          <i class="fas fa-rotate-left"></i> Khôi phục mặc định
         </button>
       </div>
 
