@@ -6,6 +6,8 @@ workers_dev = true
 [vars]
 PAGE_ORIGIN = "https://xulytiengviet.github.io"
 TURNSTILE_SITE_KEY = ""
-# Configure public TURNSTILE_SITE_KEY above; add secret TURNSTILE_SECRET via wrangler.
-# Add SESSION_SECRET (>=32 chars) and TICKET_KEY (64 hex chars) via wrangler secret put.
-# No Google OAuth credentials are needed.
+GOOGLE_CLIENT_ID = ""
+# Set GOOGLE_CLIENT_ID to the SAME public OAuth Web Client ID in docs/config.js.
+# Google tokens are verified server-side (Google JWKS, aud/iss/exp).
+# Set secrets with wrangler: TURNSTILE_SECRET, SESSION_SECRET, TICKET_KEY.
+# Do not commit Google client secrets or user tokens.
