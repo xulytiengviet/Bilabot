@@ -8,6 +8,57 @@ const WS_HOSTS = new Set(['api.tenclass.net', 'api.xiaozhi.me']);
 const VISION_HOSTS = new Set(['api.xiaozhi.me']);
 const MAX_JSON_BYTES = 32_768;
 const MAX_IMAGE_BYTES = 4 * 1024 * 1024;
+const GOOGLE_CERTS = 'https://www.googleapis.com/oauth2/v3/certs';
+let googleKeyCache = { expires: 0, keys: [] };
+
+async function googlePublicKeys(force = false) {
+  if (!force && googleKeyCache.expires > Date.now()) return googleKeyCache.keys;
+  const r = await fetch(GOOGLE_CERTS, { headers: { Accept: 'application/json' } });
+  if (!r.ok) throw new Error('Không thể tải khóa xác minh Google.');
+  const data = await r.json();
+  if (!Array.isArray(data.keys)) throw new Error('Google JWKS không hợp lệ.');
+  const age = /max-age=(\d+)/i.exec(r.headers.get('Cache-Control') || '');
+  googleKeyCache = { keys: data.keys, expires: Date.now() + Math.min(Number(age?.[1] || 3600), 3600) * 1000 };
+  return googleKeyCache.keys;
+}
+
+async function verifyGoogleIdToken(jwt, env) {
+  if (!env.GOOGLE_CLIENT_ID) throw new Error('Chưa cấu hình Google Identity Services.');
+  if (typeof jwt !== 'string' || jwt.length > 8192) throw new Error('Thiếu hoặc sai Google ID token.');
+  const segments = jwt.split('.');
+  if (segments.length !== 3) throw new Error('Định dạng Google ID token không hợp lệ.');
+  const head = jsonB64(segments[0]);
+  const claims = jsonB64(segments[1]);
+  if (head.alg !== 'RS256' || !head.kid || typeof head.kid !== 'string') throw new Error('Thuật toán xác thực Google không hợp lệ.');
+  let keys = await googlePublicKeys();
+  let jwk = keys.find(k => k.kid === head.kid && k.kty === 'RSA' && (!k.alg || k.alg === 'RS256') && (!k.use || k.use === 'sig'));
+  if (!jwk) {
+    keys = await googlePublicKeys(true);
+    jwk = keys.find(k => k.kid === head.kid && k.kty === 'RSA');
+  }
+  if (!jwk) throw new Error('Không tìm thấy khóa Google cho ID token.');
+  const publicKey = await crypto.subtle.importKey('jwk', jwk,
+    { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' }, false, ['verify']);
+  const valid = await crypto.subtle.verify('RSASSA-PKCS1-v1_5', publicKey,
+    fromB64url(segments[2]), utf8.encode(segments[0] + '.' + segments[1]));
+  const now = Math.floor(Date.now() / 1000);
+  if (!valid || claims.aud !== env.GOOGLE_CLIENT_ID ||
+      !['accounts.google.com', 'https://accounts.google.com'].includes(claims.iss) ||
+      !Number.isFinite(claims.exp) || claims.exp <= now ||
+      !Number.isFinite(claims.iat) || claims.iat > now + 60 ||
+      typeof claims.sub !== 'string' || claims.sub.length < 2) {
+    throw new Error('Google ID token không hợp lệ, sai ứng dụng hoặc đã hết hạn.');
+  }
+  return {
+    sub: 'google:' + claims.sub,
+    profile: {
+      name: typeof claims.name === 'string' ? claims.name.slice(0, 120) : '',
+      email: claims.email_verified === true && typeof claims.email === 'string' ? claims.email.slice(0, 200) : '',
+      picture: typeof claims.picture === 'string' && /^https:\/\//.test(claims.picture) ? claims.picture : ''
+    }
+  };
+}
+
 
 const utf8 = new TextEncoder();
 const fromUTF8 = new TextDecoder();
@@ -219,15 +270,18 @@ export default {
     const headers = cors(origin);
     if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers });
     if (request.method === 'GET' && url.pathname === '/api/health') {
-      return Response.json({ ready: configured(env), turnstileSiteKey: env.TURNSTILE_SITE_KEY||'', version: 2 }, { headers });
+      return Response.json({ ready: configured(env), googleConfigured: Boolean(env.GOOGLE_CLIENT_ID), turnstileSiteKey: env.TURNSTILE_SITE_KEY||'', version: 3 }, { headers });
     }
     if (!configured(env)) return bad(503, 'Worker secrets not configured', headers);
     try {
       if(request.method==='POST' && url.pathname==='/api/auth/session'){
         const body=await parseJson(request,8192);
         await verifyTurnstile(body.turnstileToken,request,env);
-        const session=await makeSession({sub:'browser:'+crypto.randomUUID()},env.SESSION_SECRET);
-        return Response.json(session,{headers});
+        const identity = env.GOOGLE_CLIENT_ID
+          ? await verifyGoogleIdToken(body.googleIdToken, env)
+          : { sub: 'browser:' + crypto.randomUUID(), profile: null };
+        const session = await makeSession(identity, env.SESSION_SECRET);
+        return Response.json({ ...session, profile: identity.profile, googleVerified: Boolean(env.GOOGLE_CLIENT_ID) }, { headers });
       }
             if (request.method === 'GET' && url.pathname === '/api/ws') {
         // Tickets are opaque AES-GCM messages valid for 60 s, not raw tokens in URLs.
