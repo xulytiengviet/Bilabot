@@ -5,7 +5,11 @@
   "pages_build_output_dir": "./dist",
   "compatibility_flags": [
     "nodejs_compat"
-  ]
+  ],
+  "vars": {
+    "TURNSTILE_SITE_KEY": "0x4AAAAAAFD4x77od9eV2Xam",
+    "PAGE_ORIGIN": "https://xulytiengviet.github.io"
+  }
   // "vars": {
   //   "MY_VAR": "my-variable"
   // },
