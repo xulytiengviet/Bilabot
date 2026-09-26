@@ -67,7 +67,7 @@
     text('bb-db-pairing',paired?'Đã ghép nối':'Chưa ghép nối');
     text('bb-db-connection',connected?'WebSocket đã kết nối':'Chưa kết nối WebSocket');
     text('bb-db-top-state',connected?'Đã kết nối XiaoZhi':paired?'Đã ghép nối':'Chưa kết nối');
-    text('bb-db-gateway-url',gatewayUrl()||'Chưa cấu hình Cloudflare Pages');
+    text('bb-db-gateway-url',gatewayUrl()?'Máy chủ BilaBot đã được khai báo':'Chờ chủ dự án kích hoạt máy chủ');
   }
   function syncGateway(){
     const fixed=window.BILABOT_CONFIG||{};
@@ -81,11 +81,11 @@
     }
     if(mode)mode.value=$('bb-relay-mode')?.value||window.BilaBotBridge?.mode||'gateway';
     if(save)save.disabled=Boolean(fixed.sameOrigin);
-    text('bb-db-gateway-url',gatewayUrl()||'Chưa cấu hình Cloudflare Pages');
+    text('bb-db-gateway-url',gatewayUrl()?'Máy chủ BilaBot đã được khai báo':'Chờ chủ dự án kích hoạt máy chủ');
     if(fixed.sameOrigin){
       text('bb-db-gateway-message','Gateway tích hợp cùng tên miền. Bạn có thể kiểm tra trạng thái.');
     }else if(!gatewayUrl()){
-      setGatewayState('idle','Chưa có gateway. Nhập địa chỉ Cloudflare Pages để kết nối OTA.');
+      setGatewayState('idle','Máy chủ chưa được kích hoạt. Chủ dự án cấu hình Cloudflare Pages một lần; người dùng không cần nhập URL.');
     }
   }
   async function checkGateway(){
@@ -178,6 +178,8 @@
   function openPairing(){
     $('closeSettingsBtn')?.click();
     window.BilaBotDirect?.openSetup?.();
+    // Same one-click provisioning as Olivia's Connect button.
+    window.BilaBotBridge?.startPair?.();
   }
   // Move native BackupSystem controls rather than copying IDs / duplicating handlers.
   const backup=$('globalSettingsPanel')?.querySelector('.settings-section');
@@ -196,6 +198,9 @@
   window.addEventListener('bilabot:pairing',refreshSummary);
   window.addEventListener('bilabot:app-ready',()=>{
     refreshSummary();syncGateway();
+    // The hosted gateway is probed automatically, without asking each user for its URL.
+    if(gatewayUrl() && ($('bb-db-mode')?.value||'gateway')==='gateway')
+      checkGateway();
     if(window.location.hash==='#bb-dashboard')openDashboard();
   });
   window.addEventListener('hashchange',()=>{
