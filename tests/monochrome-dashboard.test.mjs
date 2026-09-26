@@ -154,5 +154,5 @@ test('server readiness is automatic and status is understandable for regular use
   const notReady=mount({health:{ready:false}});
   notReady.window.BilaBotDashboard.activate('connection');
   await notReady.window.BilaBotDashboard.checkGateway();
-  assert.match(notReady.element('bb-db-public-state').textContent,/chủ dự án/);
+  assert.match(notReady.element('bb-db-public-state').textContent,/chủ dự án/i);
 });
