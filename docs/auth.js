@@ -37,7 +37,7 @@
     if(healthCache)return healthCache;
     if(!validBase()){
       setGatewayStatus('error','Chưa có Cloudflare gateway');
-      throw new Error('Để lấy mã OTA thật, cần triển khai Cloudflare Pages và khai báo địa chỉ gateway trong Cấu hình nâng cao.');
+      throw new Error('Máy chủ BilaBot chưa được kích hoạt. Chủ dự án cần triển khai Cloudflare Pages một lần; người dùng không phải tự tạo gateway.');
     }
     setGatewayStatus('checking','Đang kiểm tra Cloudflare gateway…');
     let res;
@@ -269,7 +269,7 @@
     setStatus('Chỉ dùng trực tiếp với máy chủ hỗ trợ CORS và không yêu cầu header WebSocket tùy chỉnh.');
   }else if(!validBase()){
     setGatewayStatus('error','Chưa cấu hình Cloudflare gateway');
-    setStatus('GitHub Pages chỉ có giao diện. Vào Cấu hình nâng cao để nhập gateway Cloudflare Pages của bạn.');
+    setStatus('Máy chủ chưa được chủ dự án thiết lập. Khi cấu hình hoàn tất, bạn chỉ cần nhấn Lấy mã kích hoạt.');
   }else{
     setGatewayStatus('checking','Đang kiểm tra gateway…');
     setStatus('Mở XiaoZhi.me, đăng nhập và chuẩn bị nhận mã OTA.');
