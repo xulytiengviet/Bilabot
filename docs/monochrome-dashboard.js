@@ -54,6 +54,16 @@
     text('bb-db-gateway-indicator',message||STATUS[state]||'Chưa kiểm tra');
     const el=$('bb-db-gateway-message');
     if(el){el.dataset.state=state;el.textContent=message||STATUS[state]||'Chưa kiểm tra';}
+    const publicStatus=$('bb-db-public-state');
+    if(publicStatus){
+      publicStatus.dataset.state=state;
+      publicStatus.textContent={
+        checking:'Đang kiểm tra kết nối máy chủ BilaBot…',
+        ready:'Máy chủ chuyển tiếp đã sẵn sàng. Nhấn Lấy mã OTA để bắt đầu.',
+        error:'Máy chủ chưa sẵn sàng. Chủ dự án cần kiểm tra cấu hình.',
+        idle:'Máy chủ BilaBot đang chờ chủ dự án kích hoạt.'
+      }[state]||'Đang kiểm tra trạng thái máy chủ.';
+    }
   }
   function refreshSummary(){
     const api=settings(),assistantApi=api?.assistants,id=currentId();
