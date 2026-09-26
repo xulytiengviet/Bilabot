@@ -74,8 +74,8 @@ test('Vietnamese dashboard has seven unique tabs and preserves original assistan
     'bb-db-save-gateway','bb-db-backup-slot']){
     assert.equal(html.split('id="'+id+'"').length-1,1,'ID missing/duplicated: '+id);
   }
-  assert.ok(html.includes('monochrome-dashboard.css?v=mono1'));
-  assert.ok(html.includes('monochrome-dashboard.js?v=mono1'));
+  assert.ok(html.includes('monochrome-dashboard.css?v=mono2'));
+  assert.ok(html.includes('monochrome-dashboard.js?v=mono2'));
   assert.ok(css.includes('background:#171717'));
   assert.ok(css.includes('@media(max-width:600px)'));
   assert.ok(app.includes('bilabot:settings-open'));
@@ -138,4 +138,21 @@ test('direct dashboard URL opens assistant settings after app initialization',()
   t.dispatch('bilabot:app-ready');
   assert.ok(t.calls.includes('open:assistant-1'));
   assert.equal(t.panel.dataset.pane,'overview');
+});
+
+test('Olivia-style onboarding hides admin infrastructure by default',()=>{
+  assert.match(html,/id="bb-db-admin-setup"/);
+  assert.match(html,/id="bb-db-public-state"/);
+  assert.match(html,/class="bb-db-user-steps"/);
+});
+
+test('server readiness is automatic and status is understandable for regular users',async()=>{
+  const t=mount();
+  t.dispatch('bilabot:app-ready');
+  await t.window.BilaBotDashboard.checkGateway();
+  assert.match(t.element('bb-db-public-state').textContent,/sẵn sàng/);
+  const notReady=mount({health:{ready:false}});
+  notReady.window.BilaBotDashboard.activate('connection');
+  await notReady.window.BilaBotDashboard.checkGateway();
+  assert.match(notReady.element('bb-db-public-state').textContent,/chủ dự án/);
 });
