@@ -28,7 +28,7 @@
 <link rel="stylesheet" href="./landing.css?v=studio4"/>
 <link rel="stylesheet" href="./olivia-theme.css?v=studio4"/>
 <link rel="stylesheet" href="./direct-setup.css?v=direct1"/>
-<link rel="stylesheet" href="./monochrome-dashboard.css?v=mono1"/>
+<link rel="stylesheet" href="./monochrome-dashboard.css?v=mono2"/>
 <script src="./deploy.js?v=studio4"></script>
 <script src="./config.js?v=studio4"></script>
 <script src="https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit" async defer></script>
@@ -127,7 +127,7 @@
           <div id="bb-turnstile" class="bb-turnstile" hidden></div>
         </div>
         <details class="bb-selfconfig" id="bb-selfconfig">
-          <summary><i class="fas fa-sliders" aria-hidden="true"></i> Cấu hình nâng cao <i class="fas fa-chevron-down" aria-hidden="true"></i></summary>
+          <summary><i class="fas fa-sliders" aria-hidden="true"></i> Dành cho quản trị viên: cấu hình máy chủ <i class="fas fa-chevron-down" aria-hidden="true"></i></summary>
           <label for="bb-relay-mode">Chế độ kết nối</label>
           <select id="bb-relay-mode">
             <option value="gateway">XiaoZhi chính thức · Proxy Hono trên Cloudflare Pages</option>
@@ -136,7 +136,7 @@
           <label for="bb-api-input">Địa chỉ gateway HTTPS của bạn</label>
           <input id="bb-api-input" type="url" placeholder="https://ten-du-an.pages.dev" autocomplete="off" spellcheck="false">
           <button id="bb-save-config" type="button">Lưu cấu hình</button>
-          <p class="bb-hint">GitHub Pages chỉ chạy giao diện; để lấy mã OTA cần Cloudflare Pages hoặc gateway HTTPS tin cậy. Không nhập mật khẩu hoặc secret ở đây.</p>
+          <p class="bb-hint">Phần này chỉ dành cho chủ dự án; người dùng không cần nhập địa chỉ máy chủ. Không nhập mật khẩu hoặc secret tại đây.</p>
         </details>
         <div class="bb-direct-assistant-tools"><button type="button" id="bb-open-assistant-settings"><i class="fas fa-sliders" aria-hidden="true"></i> Thiết lập trợ lý (OTA, WebSocket, thiết bị)</button></div>
         <a class="bb-setup-guide" href="https://github.com/xulytiengviet/Bilabot/blob/main/docs/SETUP.md" target="_blank" rel="noopener noreferrer">Hướng dẫn triển khai Cloudflare Pages <i class="fas fa-arrow-up-right-from-square" aria-hidden="true"></i></a>
@@ -332,14 +332,15 @@
     <div class="settings-body bb-db-body" id="bb-db-body">
       <section class="bb-dash-pane" data-pane="overview" id="bb-dash-overview">
         <span class="bb-db-eyebrow">TỔNG QUAN</span><h3>Trung tâm điều khiển BilaBot</h3>
-        <p class="bb-db-intro">Quản lý trợ lý AI, ghép nối XiaoZhi và thiết bị ESP32 ảo trên cùng một bảng điều khiển đơn sắc.</p>
+        <p class="bb-db-intro">Giống Olivia AI: chọn trợ lý, nhấn kết nối, lấy mã từ XiaoZhi rồi nhập mã để trò chuyện. Không cần tự cấu hình gateway nếu chủ dự án đã thiết lập máy chủ.</p>
         <div class="bb-db-metrics">
           <article><small>TRỢ LÝ HIỆN TẠI</small><strong id="bb-db-assistant-name">BilaBot</strong><span id="bb-db-assistant-count">Đang tải</span></article>
           <article><small>GHÉP NỐI</small><strong id="bb-db-pairing">Chưa ghép nối</strong><span id="bb-db-connection">Chưa kết nối WebSocket</span></article>
           <article><small>GATEWAY</small><strong id="bb-db-gateway">Chưa kiểm tra</strong><span id="bb-db-gateway-url">Chưa có địa chỉ gateway</span></article>
         </div>
         <div class="bb-db-card"><div class="bb-db-card-head"><div><small>THIẾT LẬP NHANH</small><h4>Kết nối với XiaoZhi</h4></div><i class="fas fa-arrow-up-right-dots" aria-hidden="true"></i></div>
-          <p>Nhận mã kích hoạt thật từ XiaoZhi và nhập vào mục thêm thiết bị trên trang chính thức. BilaBot tự xác nhận khi kết nối hoàn tất.</p>
+          <p>Nhấn Lấy mã OTA, đăng nhập XiaoZhi.me và nhập mã sáu chữ số được hiển thị. BilaBot sẽ tự kiểm tra ghép nối và kết nối giọng nói.</p>
+          <div class="bb-db-user-steps"><span><b>1</b> Lấy mã từ BilaBot</span><span><b>2</b> Nhập trên XiaoZhi.me</span><span><b>3</b> Bắt đầu trò chuyện</span></div>
           <div class="bb-db-actions"><button type="button" class="bb-db-primary" id="bb-db-quick-ota"><i class="fas fa-key" aria-hidden="true"></i> Lấy mã OTA</button><button type="button" class="bb-db-secondary" data-go-pane="connection">Cài đặt kết nối</button><a class="bb-db-secondary" href="https://xiaozhi.me/console/agents" target="_blank" rel="noopener noreferrer">Mở XiaoZhi.me ↗</a></div>
         </div>
         <div class="bb-db-card bb-db-sysinfo"><h4>Thông tin hệ thống</h4><div><span>Ứng dụng</span><strong>BilaBot · Trợ lý giọng nói tiếng Việt</strong></div><div><span>Giao thức</span><strong>WebSocket · Opus · OTA</strong></div><div><span>Nguồn mở</span><strong>Olivia AI · Giấy phép MIT</strong></div></div>
@@ -391,15 +392,17 @@
       </div>
 
       <div class="settings-section bb-dash-pane" data-pane="connection" id="bb-dash-connection">
-        <span class="bb-db-eyebrow">CÀI ĐẶT / KẾT NỐI</span><h3>Kết nối XiaoZhi</h3><p class="bb-db-intro">Thiết lập gateway Cloudflare Pages, OTA và WebSocket cho thiết bị ảo.</p>
-        <div class="bb-db-card bb-db-gateway-form"><div class="bb-db-card-head"><div><small>01 / GATEWAY</small><h4>Máy chủ trung gian</h4></div><span id="bb-db-gateway-indicator">Chưa kiểm tra</span></div>
+        <span class="bb-db-eyebrow">CÀI ĐẶT / KẾT NỐI</span><h3>Kết nối XiaoZhi</h3><p class="bb-db-intro">Người dùng chỉ cần đăng nhập XiaoZhi.me và lấy mã OTA. Phần máy chủ được chủ dự án cấu hình một lần, không phải thiết lập trên từng máy.</p>
+        <details class="bb-db-admin-setup" id="bb-db-admin-setup"><summary><i class="fas fa-lock" aria-hidden="true"></i> Quản trị viên: cấu hình máy chủ BilaBot <i class="fas fa-chevron-down" aria-hidden="true"></i></summary>
+        <p class="bb-db-admin-note">Chỉ chủ dự án cần triển khai Cloudflare Pages một lần. Người dùng BilaBot không cần tài khoản Cloudflare, URL gateway hoặc khóa bí mật.</p>
+        <div class="bb-db-card bb-db-gateway-form"><div class="bb-db-card-head"><div><small>CẤU HÌNH HỆ THỐNG / GATEWAY</small><h4>Máy chủ trung gian</h4></div><span id="bb-db-gateway-indicator">Chưa kiểm tra</span></div>
           <label for="bb-db-proxy-url">Địa chỉ Cloudflare Pages</label><input id="bb-db-proxy-url" type="url" spellcheck="false" autocomplete="off" placeholder="https://ten-du-an.pages.dev"/>
           <small>GitHub Pages chỉ chạy giao diện. Để lấy mã OTA thật, cần gateway HTTPS đã triển khai.</small>
           <label for="bb-db-mode">Chế độ kết nối</label><select id="bb-db-mode"><option value="gateway">Gateway Hono · XiaoZhi chính thức</option><option value="direct">Máy chủ tự quản hỗ trợ CORS</option></select>
           <div class="bb-db-actions"><button type="button" id="bb-db-check-gateway" class="bb-db-secondary">Kiểm tra kết nối</button><button type="button" id="bb-db-save-gateway" class="bb-db-primary">Lưu và tải lại</button></div>
           <p class="bb-db-inline-status" id="bb-db-gateway-message" role="status" aria-live="polite">Chưa kiểm tra gateway.</p>
-        </div>
-        <div class="bb-db-card"><div class="bb-db-card-head"><div><small>02 / OTA</small><h4>Kích hoạt thiết bị</h4></div></div><p>Nhận mã từ XiaoZhi và theo dõi trạng thái ghép nối ngay trong BilaBot.</p><button type="button" class="bb-db-primary" id="bb-db-open-pairing"><i class="fas fa-key" aria-hidden="true"></i> Lấy mã / Ghép nối</button></div>
+        </div></details>
+        <div class="bb-db-card"><div class="bb-db-card-head"><div><small>KẾT NỐI NGAY / OTA</small><h4>Kích hoạt thiết bị</h4></div></div><p>Nhận mã từ XiaoZhi và theo dõi trạng thái ghép nối ngay trong BilaBot.</p><button type="button" class="bb-db-primary" id="bb-db-open-pairing"><i class="fas fa-key" aria-hidden="true"></i> Lấy mã / Ghép nối</button></div>
         <div class="form-group">
           <label for="wsUrlInput">WebSocket URL</label>
           <input type="text" id="wsUrlInput" placeholder="wss://api.xiaozhi.me/xiaozhi/v1/"
@@ -873,8 +876,8 @@
 
 <!-- Our JS modules (loaded as module scripts) -->
 <script src="./auth.js?v=direct1"></script>
-<script src="./direct-setup.js?v=direct1"></script>
-<script src="./monochrome-dashboard.js?v=mono1"></script>
+<script src="./direct-setup.js?v=direct2"></script>
+<script src="./monochrome-dashboard.js?v=mono2"></script>
 <script type="module" src="./static/app.js?v=direct1"></script>
 
 </body>
