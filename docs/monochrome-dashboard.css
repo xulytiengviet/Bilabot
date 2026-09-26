@@ -216,3 +216,32 @@ body.bb-mono-settings.bb-setup-open #bilabot-gate .bb-setup-guide{color:#333!imp
 @media(max-width:600px){
  #app .bb-header-dashboard-btn,#app .bb-header-setup-btn{min-width:33px;max-width:37px}
 }
+
+/* Olivia-like end-user flow: three simple actions; infrastructure for site owners only. */
+#settingsPanel .bb-db-user-steps{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));
+  margin:18px 0 3px;gap:8px}
+#settingsPanel .bb-db-user-steps span{display:flex;align-items:center;gap:10px;
+  padding:13px 11px;border:1px solid #e8e8e8;border-radius:9px;color:#454545;
+  background:#fafafa;font-size:11px;font-weight:700;line-height:1.4}
+#settingsPanel .bb-db-user-steps b{width:23px;height:23px;display:grid;place-items:center;
+  background:#202020;color:#fff;flex:none;border-radius:7px;font-size:11px}
+#settingsPanel .bb-db-admin-setup{background:#f5f5f5;border:1px solid #dedede;
+  border-radius:12px;margin:20px 0;padding:0 16px 15px;color:#252525}
+#settingsPanel .bb-db-admin-setup>summary{display:flex;align-items:center;gap:9px;
+  list-style:none;cursor:pointer;min-height:49px;font-size:12px;font-weight:800}
+#settingsPanel .bb-db-admin-setup>summary::-webkit-details-marker{display:none}
+#settingsPanel .bb-db-admin-setup>summary i:last-child{margin-left:auto;transition:transform .16s}
+#settingsPanel .bb-db-admin-setup[open]>summary i:last-child{transform:rotate(180deg)}
+#settingsPanel .bb-db-admin-note{font-size:11px;line-height:1.7;color:#666;margin:0 0 13px}
+#settingsPanel .bb-db-admin-setup .bb-db-card{margin:0}
+#settingsPanel .bb-db-public-state{display:flex;align-items:center;gap:10px;
+  margin:14px 0 17px;padding:14px 16px;background:#fff;border:1px solid #dedede;
+  border-radius:11px;color:#555;font-size:12px;font-weight:650}
+#settingsPanel .bb-db-public-state::before{content:"";height:8px;width:8px;flex:none;
+  background:#888;border-radius:50%}
+#settingsPanel .bb-db-public-state[data-state="ready"]::before{background:#151515}
+#settingsPanel .bb-db-public-state[data-state="error"]{border-style:dashed}
+@media(max-width:600px){
+ #settingsPanel .bb-db-user-steps{grid-template-columns:1fr}
+ #settingsPanel .bb-db-admin-setup{padding:0 10px 12px}
+}
