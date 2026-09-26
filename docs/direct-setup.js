@@ -17,10 +17,10 @@
     dialog?.setAttribute('aria-hidden', 'false');
     const pane = byId('bb-setup');
     if (pane) pane.scrollTop = 0;
-    if (!window.BilaBotBridge?.apiBase) {
-      const config = byId('bb-selfconfig');
-      if (config) config.open = true;
-    }
+    // Keep infrastructure configuration hidden from regular users.
+    // The project owner may expand the advanced settings manually if needed.
+    const config = byId('bb-selfconfig');
+    if(config)config.open=false;
     // Ensure that the mobile sidebar cannot cover the settings drawer.
     byId('sidebar')?.classList.remove('mobile-open');
     byId('bb-close-setup')?.focus({ preventScroll: true });
@@ -94,9 +94,15 @@
   document.body.classList.add('bilabot-open');
   byId('bilabot-gate')?.setAttribute('aria-hidden', 'true');
 
-  for (const id of ['bb-open-setup-sidebar', 'bb-open-setup-chat', 'bb-return-home']) {
-    byId(id)?.addEventListener('click', event => openSetup(event.currentTarget));
+  for (const id of ['bb-open-setup-sidebar', 'bb-open-setup-chat']) {
+    byId(id)?.addEventListener('click', event => {
+      openSetup(event.currentTarget);
+      // Same behavior as Olivia's Connect: one click starts real OTA.
+      // A pending or already connected session is handled by startPair().
+      window.BilaBotBridge?.startPair?.();
+    });
   }
+  byId('bb-return-home')?.addEventListener('click',event=>openSetup(event.currentTarget));
   byId('bb-close-setup')?.addEventListener('click', () => closeSetup());
   byId('bb-open-assistant-settings')?.addEventListener('click', assistantSettings);
   byId('bilabot-gate')?.addEventListener('click', event => {
