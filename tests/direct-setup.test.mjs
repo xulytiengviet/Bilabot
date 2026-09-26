@@ -62,7 +62,7 @@ test('root opens the real Olivia-style app and contains direct setup controls',(
     assert.equal(html.split('id="'+id+'"').length-1,1,'missing or duplicate '+id);
   }
   assert.ok(html.includes('./direct-setup.css?v=direct1'));
-  assert.ok(html.includes('./direct-setup.js?v=direct1'));
+  assert.ok(html.includes('./direct-setup.js?v=direct2'));
   assert.ok(css.includes('body.bilabot-open.bb-setup-open'));
   assert.ok(css.includes('@media(max-width:768px)'));
   assert.ok(app.includes('window.BilaBotDirect?.isOpen?.()'));
