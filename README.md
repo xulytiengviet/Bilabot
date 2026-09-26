@@ -6,6 +6,14 @@ BilaBot là ứng dụng trợ lý giọng nói tiếng Việt chạy trên trì
 **Bảng điều khiển tiếng Việt:** https://xulytiengviet.github.io/Bilabot/#bb-dashboard  
 **Lấy mã và ghép nối:** https://xulytiengviet.github.io/Bilabot/#bb-setup
 
+## Sử dụng giống Olivia AI — không cần tự triển khai đối với người dùng
+
+**Người dùng BilaBot:** mở website → chọn trợ lý / nhấn **Lấy mã OTA** → nhận mã sáu chữ số do XiaoZhi cấp → đăng nhập XiaoZhi.me và nhập mã → BilaBot tự theo dõi trạng thái và kết nối WebSocket khi máy chủ xác nhận. Nút Lấy mã trên sidebar, header và Dashboard khởi động OTA bằng một thao tác. Giao diện kiểm tra gateway mặc định tự động; URL gateway và thông số máy chủ chỉ hiện trong vùng **Dành cho quản trị viên**.
+
+**Chủ dự án (chỉ làm một lần):** triển khai Hono lên Cloudflare Pages, cấu hình Turnstile và secret của hệ thống, cho phép origin GitHub Pages rồi đặt `CLOUDFLARE_PAGES_URL` trong GitHub Actions để tất cả người dùng tự dùng gateway đã triển khai. GitHub Pages thuần không thể xử lý OTA/WebSocket chuẩn XiaoZhi; không có cách tự tạo mã từ đăng nhập Google nếu không có yêu cầu OTA của thiết bị ảo.
+
+**Lưu ý:** OliviaAI.dev cũng dùng backend Hono do tác giả đã triển khai sẵn. Olivia gốc không đòi người dùng cấu hình Cloudflare; BilaBot áp dụng cơ chế an toàn bổ sung (Turnstile và phiên gateway), nhưng thao tác đó thuộc về chủ dự án, không phải người sử dụng cuối. Khi `CLOUDFLARE_PAGES_URL` chưa được thiết lập, giao diện có thể xem nhưng chưa thể nhận mã OTA thực.
+
 ## Dashboard cài đặt đơn sắc (đen · trắng · xám)
 
 Dashboard hiển thị trực tiếp trong giao diện trợ lý kiểu Olivia AI. Trên thanh bên hoặc tiêu đề hội thoại, nhấn **Cài đặt / Bảng điều khiển**. Bảy mục được Việt hóa: **Tổng quan**, **Trợ lý AI**, **Kết nối XiaoZhi**, **Thiết bị ảo**, **Giao thức**, **Giọng nói** và **Sao lưu & dữ liệu**.
