@@ -6,7 +6,9 @@
 (() => {
   'use strict';
   const onGitHub = location.hostname.toLowerCase() === 'xulytiengviet.github.io';
-  let deployed = '';
+  // Public project gateway: users of GitHub Pages do not need to configure it.
+  // The optional deploy.js value (if set) still overrides this default.
+  let deployed = 'https://bilabot-web.pages.dev';
   try {
     const value = String(window.BILABOT_DEPLOY_URL || '').trim();
     if (value) {
