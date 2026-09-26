@@ -76,7 +76,7 @@ test('unpaired first visit opens setup, allows gateway configuration and safe cl
   assert.equal(ctx.classes.has('bilabot-open'),true);
   assert.equal(ctx.classes.has('bb-setup-open'),true);
   assert.equal(ctx.el('bilabot-gate').attributes['aria-hidden'],'false');
-  assert.equal(ctx.el('bb-selfconfig').open,true);
+  assert.equal(ctx.el('bb-selfconfig').open,false); // No backend setup demanded of end users
   assert.equal(ctx.focus.at(-1),'bb-close-setup');
   ctx.click('bb-close-setup');
   assert.equal(ctx.classes.has('bb-setup-open'),false);
@@ -116,4 +116,15 @@ test('dashboard fragment skips automatic OTA drawer even before first pairing',(
   ctx.emit('bilabot:app-ready');
   assert.equal(ctx.classes.has('bb-setup-open'),false);
   assert.equal(ctx.classes.has('bilabot-open'),true);
+});
+
+test('one click on BilaBot Connect immediately starts real pairing',()=>{
+  const ctx=bootstrap({paired:false});
+  let count=0;
+  ctx.window.BilaBotBridge={startPair(){count++;}};
+  ctx.click('bb-open-setup-sidebar');
+  assert.equal(count,1);
+  assert.equal(ctx.classes.has('bb-setup-open'),true);
+  ctx.click('bb-open-setup-chat');
+  assert.equal(count,2);
 });
